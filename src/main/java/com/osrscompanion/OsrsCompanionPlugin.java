@@ -1,7 +1,7 @@
-package com.mcpsync;
+package com.osrscompanion;
 
 import com.google.inject.Provides;
-import com.mcpsync.model.PlayerSyncData;
+import com.osrscompanion.model.PlayerSyncData;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.*;
@@ -19,13 +19,13 @@ import java.util.concurrent.ScheduledExecutorService;
 	description = "Saves player data locally as JSON for use with AI assistants via MCP",
 	tags = {"sync", "data", "export", "mcp", "ai"}
 )
-public class McpSyncPlugin extends Plugin
+public class OsrsCompanionPlugin extends Plugin
 {
 	@Inject
 	private Client client;
 
 	@Inject
-	private McpSyncConfig config;
+	private OsrsCompanionConfig config;
 
 	@Inject
 	private ScheduledExecutorService executor;
@@ -43,7 +43,7 @@ public class McpSyncPlugin extends Plugin
 		collector = new PlayerDataCollector(client);
 		writer = new PlayerDataWriter();
 		recalcSyncThreshold();
-		log.info("MCP Sync started — saving to ~/.runelite/mcp-sync/");
+		log.info("OSRS Companion started — saving to ~/.runelite/osrs-companion/");
 	}
 
 	@Override
@@ -56,13 +56,13 @@ public class McpSyncPlugin extends Plugin
 		}
 		collector = null;
 		writer = null;
-		log.info("MCP Sync stopped");
+		log.info("OSRS Companion stopped");
 	}
 
 	@Provides
-	McpSyncConfig provideConfig(ConfigManager configManager)
+	OsrsCompanionConfig provideConfig(ConfigManager configManager)
 	{
-		return configManager.getConfig(McpSyncConfig.class);
+		return configManager.getConfig(OsrsCompanionConfig.class);
 	}
 
 	@Subscribe
@@ -251,7 +251,7 @@ public class McpSyncPlugin extends Plugin
 			}
 			catch (Exception e)
 			{
-				log.warn("MCP Sync: Save error", e);
+				log.warn("OSRS Companion: Save error", e);
 			}
 		});
 	}

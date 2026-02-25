@@ -1,7 +1,7 @@
-package com.mcpsync;
+package com.osrscompanion;
 
-import com.mcpsync.model.PlayerSyncData;
-import com.mcpsync.model.PlayerSyncData.*;
+import com.osrscompanion.model.PlayerSyncData;
+import com.osrscompanion.model.PlayerSyncData.*;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.Quest;
@@ -281,7 +281,7 @@ public class PlayerDataCollector
 	}
 
 	/**
-	 * Build the full snapshot for upload.
+	 * Build the full snapshot for saving.
 	 */
 	public PlayerSyncData buildSnapshot()
 	{

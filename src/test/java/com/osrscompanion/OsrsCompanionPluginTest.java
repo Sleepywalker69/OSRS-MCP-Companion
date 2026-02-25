@@ -1,13 +1,13 @@
-package com.mcpsync;
+package com.osrscompanion;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class McpSyncPluginTest
+public class OsrsCompanionPluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(McpSyncPlugin.class);
+		ExternalPluginManager.loadBuiltin(OsrsCompanionPlugin.class);
 		RuneLite.main(args);
 	}
 }

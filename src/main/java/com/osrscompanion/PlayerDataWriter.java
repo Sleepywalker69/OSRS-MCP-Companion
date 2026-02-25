@@ -1,8 +1,8 @@
-package com.mcpsync;
+package com.osrscompanion;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.mcpsync.model.PlayerSyncData;
+import com.osrscompanion.model.PlayerSyncData;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -10,7 +10,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 /**
- * Writes player data as JSON to a local file in ~/.runelite/mcp-sync/.
+ * Writes player data as JSON to a local file in ~/.runelite/osrs-companion/.
  */
 @Slf4j
 public class PlayerDataWriter
@@ -21,12 +21,12 @@ public class PlayerDataWriter
 
 	public PlayerDataWriter()
 	{
-		this.syncDir = new File(System.getProperty("user.home"), ".runelite/mcp-sync");
+		this.syncDir = new File(System.getProperty("user.home"), ".runelite/osrs-companion");
 	}
 
 	/**
 	 * Write player data to a local JSON file.
-	 * File is written to ~/.runelite/mcp-sync/{username}.json
+	 * File is written to ~/.runelite/osrs-companion/{username}.json
 	 *
 	 * @return true if write succeeded, false otherwise
 	 */
@@ -34,13 +34,13 @@ public class PlayerDataWriter
 	{
 		if (data.player == null || data.player.username == null)
 		{
-			log.debug("MCP Sync: No player data available, skipping write");
+			log.debug("OSRS Companion: No player data available, skipping write");
 			return false;
 		}
 
 		if (!syncDir.exists() && !syncDir.mkdirs())
 		{
-			log.warn("MCP Sync: Failed to create sync directory: {}", syncDir.getAbsolutePath());
+			log.warn("OSRS Companion: Failed to create sync directory: {}", syncDir.getAbsolutePath());
 			return false;
 		}
 
@@ -51,12 +51,12 @@ public class PlayerDataWriter
 		try (FileWriter writer = new FileWriter(outputFile))
 		{
 			writer.write(json);
-			log.debug("MCP Sync: Saved data for {} to {}", data.player.username, outputFile.getAbsolutePath());
+			log.debug("OSRS Companion: Saved data for {} to {}", data.player.username, outputFile.getAbsolutePath());
 			return true;
 		}
 		catch (IOException e)
 		{
-			log.warn("MCP Sync: Failed to write data file", e);
+			log.warn("OSRS Companion: Failed to write data file", e);
 			return false;
 		}
 	}

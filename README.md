@@ -7,7 +7,7 @@ Model Context Protocol (MCP).
 ## What It Does
 
 Periodically saves a snapshot of your player data to local JSON files
-in `~/.runelite/mcp-sync/`. This data can then be read by the companion MCP
+in `~/.runelite/osrs-companion/`. This data can then be read by the companion MCP
 server to give AI assistants (like Claude) context about your account.
 
 **Data stays on your machine. Nothing is sent over the network.**
@@ -34,7 +34,7 @@ All data categories can be individually toggled in the plugin settings.
 ## Where Data Is Saved
 
 ```
-~/.runelite/mcp-sync/{username}.json
+~/.runelite/osrs-companion/{username}.json
 ```
 
 Each logged-in character gets its own JSON file, updated periodically and on logout.

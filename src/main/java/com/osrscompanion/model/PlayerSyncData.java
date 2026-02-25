@@ -1,4 +1,4 @@
-package com.mcpsync.model;
+package com.osrscompanion.model;
 
 import java.util.List;
 import java.util.Map;

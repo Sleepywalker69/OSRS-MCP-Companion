@@ -1,12 +1,12 @@
-package com.mcpsync;
+package com.osrscompanion;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
-@ConfigGroup("mcpsync")
-public interface McpSyncConfig extends Config
+@ConfigGroup("osrscompanion")
+public interface OsrsCompanionConfig extends Config
 {
 	@ConfigSection(
 		name = "Storage",
