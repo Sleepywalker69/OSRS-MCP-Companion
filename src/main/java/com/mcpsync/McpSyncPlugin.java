@@ -1,0 +1,268 @@
+package com.mcpsync;
+
+import com.google.inject.Provides;
+import com.mcpsync.model.PlayerSyncData;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.*;
+import net.runelite.api.events.*;
+import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDescriptor;
+
+import javax.inject.Inject;
+import java.util.concurrent.ScheduledExecutorService;
+
+@Slf4j
+@PluginDescriptor(
+	name = "OSRS MCP Companion",
+	description = "Saves player data locally as JSON for use with AI assistants via MCP",
+	tags = {"sync", "data", "export", "mcp", "ai"}
+)
+public class McpSyncPlugin extends Plugin
+{
+	@Inject
+	private Client client;
+
+	@Inject
+	private McpSyncConfig config;
+
+	@Inject
+	private ScheduledExecutorService executor;
+
+	private PlayerDataCollector collector;
+	private PlayerDataWriter writer;
+	private boolean dirty = false;
+	private int tickCounter = 0;
+	private int syncTickThreshold = 100; // recalculated from config
+	private boolean initialCollectionDone = false;
+
+	@Override
+	protected void startUp()
+	{
+		collector = new PlayerDataCollector(client);
+		writer = new PlayerDataWriter();
+		recalcSyncThreshold();
+		log.info("MCP Sync started — saving to ~/.runelite/mcp-sync/");
+	}
+
+	@Override
+	protected void shutDown()
+	{
+		// Final save on shutdown
+		if (client.getGameState() == GameState.LOGGED_IN)
+		{
+			doSave();
+		}
+		collector = null;
+		writer = null;
+		log.info("MCP Sync stopped");
+	}
+
+	@Provides
+	McpSyncConfig provideConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(McpSyncConfig.class);
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			// Delay initial collection to let the client populate data
+			tickCounter = -10;
+			initialCollectionDone = false;
+		}
+		else if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			// Save before logout
+			doSave();
+			initialCollectionDone = false;
+		}
+	}
+
+	@Subscribe
+	public void onStatChanged(StatChanged event)
+	{
+		if (collector != null && config.syncSkills())
+		{
+			collector.updateSkill(event.getSkill(), event.getLevel(), event.getXp());
+			dirty = true;
+		}
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		if (collector == null)
+		{
+			return;
+		}
+
+		int containerId = event.getContainerId();
+
+		if (containerId == InventoryID.BANK.getId() && config.syncBank())
+		{
+			collector.updateBank(event.getItemContainer());
+			dirty = true;
+		}
+		else if (containerId == InventoryID.INVENTORY.getId() && config.syncInventory())
+		{
+			collector.updateInventory(event.getItemContainer());
+			dirty = true;
+		}
+		else if (containerId == InventoryID.EQUIPMENT.getId() && config.syncEquipment())
+		{
+			collector.updateEquipment(event.getItemContainer());
+			dirty = true;
+		}
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		// Mark dirty so diaries/CAs get picked up on next poll
+		dirty = true;
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		if (client.getGameState() != GameState.LOGGED_IN || collector == null)
+		{
+			return;
+		}
+
+		tickCounter++;
+
+		// Initial full collection after login (after a short delay)
+		if (!initialCollectionDone && tickCounter >= 0)
+		{
+			doFullCollection();
+			initialCollectionDone = true;
+			dirty = true;
+			// Save immediately after initial collection
+			doSave();
+			return;
+		}
+
+		// Periodic polling every ~30 ticks (~18 seconds)
+		if (tickCounter % 30 == 0)
+		{
+			if (config.syncQuests())
+			{
+				collector.pollQuests();
+			}
+			if (config.syncDiaries())
+			{
+				collector.pollDiaries();
+			}
+			if (config.syncCombatAchievements())
+			{
+				collector.pollCombatAchievements();
+			}
+		}
+
+		// Save at configured interval
+		if (dirty && tickCounter >= syncTickThreshold)
+		{
+			tickCounter = 0;
+			doSave();
+		}
+	}
+
+	/**
+	 * Perform a full collection of all data sources.
+	 */
+	private void doFullCollection()
+	{
+		if (config.syncSkills())
+		{
+			collector.pollAllSkills();
+		}
+
+		if (config.syncBank())
+		{
+			ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+			if (bank != null)
+			{
+				collector.updateBank(bank);
+			}
+		}
+
+		if (config.syncInventory())
+		{
+			ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+			if (inv != null)
+			{
+				collector.updateInventory(inv);
+			}
+		}
+
+		if (config.syncEquipment())
+		{
+			ItemContainer equip = client.getItemContainer(InventoryID.EQUIPMENT);
+			if (equip != null)
+			{
+				collector.updateEquipment(equip);
+			}
+		}
+
+		if (config.syncQuests())
+		{
+			collector.pollQuests();
+		}
+
+		if (config.syncDiaries())
+		{
+			collector.pollDiaries();
+		}
+
+		if (config.syncCombatAchievements())
+		{
+			collector.pollCombatAchievements();
+		}
+	}
+
+	/**
+	 * Build snapshot and save to local file in background.
+	 */
+	private void doSave()
+	{
+		if (collector == null || writer == null || !dirty)
+		{
+			return;
+		}
+
+		PlayerSyncData snapshot = collector.buildSnapshot();
+		if (snapshot.player == null)
+		{
+			return;
+		}
+
+		dirty = false;
+
+		executor.submit(() ->
+		{
+			try
+			{
+				writer.write(snapshot);
+			}
+			catch (Exception e)
+			{
+				log.warn("MCP Sync: Save error", e);
+			}
+		});
+	}
+
+	/**
+	 * Recalculate the game tick threshold for sync interval.
+	 * 1 game tick ≈ 0.6 seconds.
+	 */
+	private void recalcSyncThreshold()
+	{
+		int seconds = Math.max(30, config.syncIntervalSeconds());
+		syncTickThreshold = (int) (seconds / 0.6);
+	}
+}
