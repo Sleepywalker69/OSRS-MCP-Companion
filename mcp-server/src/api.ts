@@ -25,6 +25,29 @@ export async function apiGet(path: string): Promise<any> {
   }
 }
 
+export async function apiPost(path: string): Promise<any> {
+  const url = `${API_BASE}${path}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`API POST ${path}: ${res.status} ${body}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    if (err?.name === "TimeoutError" || err?.code === "ECONNREFUSED") {
+      throw new Error(
+        `Cannot reach the OSRS Companion RuneLite plugin API at ${API_BASE}. ` +
+          `Make sure RuneLite is running with the OSRS MCP Companion plugin enabled.`
+      );
+    }
+    throw err;
+  }
+}
+
 export function isApiError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);

@@ -20,6 +20,7 @@ import { registerLiveStateTools } from "./tools/live-state.js";
 import { registerWidgetTools } from "./tools/widgets.js";
 import { registerDefinitionTools } from "./tools/definitions.js";
 import { registerDevTools } from "./tools/devtools.js";
+import { registerDebugTools } from "./tools/debug.js";
 
 const server = new McpServer({
   name: "osrs-mcp-companion",
@@ -33,6 +34,7 @@ registerLiveStateTools(server);
 registerWidgetTools(server);
 registerDefinitionTools(server);
 registerDevTools(server);
+registerDebugTools(server);
 
 // Connect via stdio transport
 const transport = new StdioServerTransport();

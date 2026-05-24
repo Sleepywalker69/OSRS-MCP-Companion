@@ -163,6 +163,37 @@ export function registerDevTools(server: McpServer) {
   );
 
   server.tool(
+    "active_prayers",
+    "Get currently active prayers and prayer points. Use this when the user asks 'what prayers are on', 'am I praying', 'what protection prayer', or to check prayer status during combat.",
+    {},
+    async () => {
+      try {
+        const data = await apiGet("/api/prayers");
+        const active = data.active || [];
+        if (active.length === 0) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `No prayers active. Prayer points: ${data.prayerPoints}/${data.maxPrayer}`,
+              },
+            ],
+          };
+        }
+        const lines = [
+          `# Active Prayers — ${active.length} active`,
+          `Prayer Points: ${data.prayerPoints}/${data.maxPrayer}`,
+          "",
+          ...active.map((p: string) => `  ✦ ${p}`),
+        ];
+        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+      } catch (err) {
+        return { content: [{ type: "text" as const, text: isApiError(err) }] };
+      }
+    }
+  );
+
+  server.tool(
     "xp_tracker",
     "Get XP gains this session — total and per-skill breakdown. Use this when the user asks 'how much XP have I gained', 'what's my XP rate', or 'show my session stats'.",
     {},

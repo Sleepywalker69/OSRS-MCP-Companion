@@ -2,20 +2,20 @@
 
 A RuneLite plugin that exposes **live game data** via a local HTTP API, paired
 with an MCP server that gives AI assistants (Claude Desktop, Claude Code, etc.)
-direct access to 40+ game state tools. Think IDA for Old School RuneScape —
+direct access to 50+ game state tools. Think IDA for Old School RuneScape —
 connect via MCP and query any data you need in real time.
 
 ## What It Does
 
 1. **RuneLite Plugin** — Runs a local HTTP API server (default `http://127.0.0.1:8085`)
-   inside RuneLite with 42 endpoints covering every aspect of game state.
+   inside RuneLite with 47 endpoints covering every aspect of game state.
 2. **MCP Server** — A TypeScript MCP server (`mcp-server/`) that wraps all HTTP
-   endpoints as 44 MCP tools with rich descriptions for intuitive AI prompting.
+   endpoints as 50 MCP tools with rich descriptions for intuitive AI prompting.
 3. **File Sync** — Periodically saves player snapshots to JSON files for offline use.
 
 **All data stays on your machine. The API only binds to localhost.**
 
-## MCP Tools (44 total)
+## MCP Tools (50 total)
 
 The MCP server provides tools across six categories:
 
@@ -55,7 +55,7 @@ The MCP server provides tools across six categories:
 | `lookup_enum` | Enum definition (key-value pairs) |
 | `lookup_struct` | Struct definition (param values) |
 
-### DevTools (7 tools)
+### DevTools (8 tools)
 | Tool | What it does |
 |------|-------------|
 | `read_varbit` | Read current varbit value(s) |
@@ -63,8 +63,18 @@ The MCP server provides tools across six categories:
 | `var_history` | Recent varbit/varp changes with old/new values |
 | `recent_interactions` | Recent clicks and hovers — "what did I just click?" |
 | `graphics_objects` | Active visual effects (spell impacts, etc.) |
+| `active_prayers` | Currently active prayers and prayer points |
 | `xp_tracker` | Session XP gains per skill |
 | `loot_log` | Session loot drops, filterable by NPC |
+
+### Debug & Recording (5 tools)
+| Tool | What it does |
+|------|-------------|
+| `debug_snapshot` | **Instant** full combat state snapshot — player, NPCs, prayers, inventory, equipment, recent interactions, effects. One call does it all |
+| `start_recording` | Start recording all game events for a duration (default 3 min, max 10 min) |
+| `stop_recording` | Stop an active recording early |
+| `recording_status` | Check recording progress — events captured, time remaining |
+| `get_recording` | Retrieve recorded timeline with filtering by event type and tick range |
 
 ### Wiki & Prices (3 tools)
 | Tool | What it does |
@@ -132,10 +142,13 @@ With RuneLite running and the plugin enabled, ask Claude things like:
 - "What did I just click?"
 - "How much XP have I gained this session?"
 - "What's the price of an Abyssal whip?"
+- "Why is it stuck? Debug this" (instant snapshot)
+- "Record the next 3 minutes while I run the script"
+- "What happened? Show me the recording"
 
 ## Live API Endpoints
 
-All 42 endpoints available at `http://127.0.0.1:8085`:
+All 47 endpoints available at `http://127.0.0.1:8085`:
 
 | Endpoint | Description |
 |----------|-------------|
@@ -180,6 +193,11 @@ All 42 endpoints available at `http://127.0.0.1:8085`:
 | `GET /api/wiki/search?q=X` | Wiki search proxy |
 | `GET /api/wiki/page-info?title=X` | Wiki page info proxy |
 | `GET /api/wiki/parse?title=X` | Wiki page parse proxy |
+| `GET /api/prayers` | Active prayers and prayer points |
+| `POST /api/recording/start?duration=N` | Start recording events (seconds, default 180, max 600) |
+| `POST /api/recording/stop` | Stop recording |
+| `GET /api/recording/status` | Recording state and progress |
+| `GET /api/recording/data` | Recorded events. `?types=X`, `?from_tick=X&to_tick=Y`, `?last=N` |
 | `GET /api/events` | Server-Sent Events stream |
 
 ## Configuration

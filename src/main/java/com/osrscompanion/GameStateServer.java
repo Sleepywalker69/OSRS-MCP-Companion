@@ -76,6 +76,14 @@ public class GameStateServer
 	private static final int MAX_INTERACTION_HISTORY = 200;
 	private String lastHoverTarget = "";
 
+	// Recording system
+	private volatile boolean isRecording = false;
+	private int recordingStartTick = 0;
+	private int recordingMaxTicks = 500;
+	private final List<Map<String, Object>> recordingBuffer = Collections.synchronizedList(new ArrayList<>());
+	private static final int MAX_RECORDING_ENTRIES = 10_000;
+	private int recordingTickCounter = 0; // for throttling game_tick recordings
+
 	private static final Map<Integer, String> KNOWN_INTERFACES;
 	static
 	{
@@ -167,6 +175,11 @@ public class GameStateServer
 		server.createContext("/api/var-history", this::handleVarHistory);
 		server.createContext("/api/interaction-history", this::handleInteractionHistory);
 		server.createContext("/api/graphics-objects", this::handleGraphicsObjects);
+		server.createContext("/api/prayers", this::handlePrayers);
+		server.createContext("/api/recording/start", this::handleRecordingStart);
+		server.createContext("/api/recording/stop", this::handleRecordingStop);
+		server.createContext("/api/recording/status", this::handleRecordingStatus);
+		server.createContext("/api/recording/data", this::handleRecordingData);
 		server.createContext("/", this::handleIndex);
 
 		serverExecutor = Executors.newCachedThreadPool(r ->
@@ -1090,6 +1103,11 @@ public class GameStateServer
 		endpoints.add(ep("GET /api/var-history", "Recent var changes (last 200). ?type=varbit|varp to filter, ?last=N for recent"));
 		endpoints.add(ep("GET /api/interaction-history", "Recent clicks and hovers (last 200). ?last=N for recent"));
 		endpoints.add(ep("GET /api/graphics-objects", "Active graphics objects (spell effects, visual FX)"));
+		endpoints.add(ep("GET /api/prayers", "Currently active prayers and prayer points"));
+		endpoints.add(ep("POST /api/recording/start?duration=N", "Start recording game events for N seconds (default 180, max 600)"));
+		endpoints.add(ep("POST /api/recording/stop", "Stop recording, keep buffered events"));
+		endpoints.add(ep("GET /api/recording/status", "Recording state: active, ticks elapsed, events logged"));
+		endpoints.add(ep("GET /api/recording/data", "Get recorded events. ?types=game_tick,hitsplat &from_tick=X &to_tick=Y &last=N"));
 		index.put("endpoints", endpoints);
 
 		sendJson(exchange, 200, index);
@@ -2911,6 +2929,235 @@ public class GameStateServer
 		{
 			sendError(exchange, 500, e.getMessage());
 		}
+	}
+
+	// --- Prayer endpoint ---
+
+	private void handlePrayers(HttpExchange exchange) throws IOException
+	{
+		if (!requireLoggedIn(exchange))
+		{
+			return;
+		}
+
+		try
+		{
+			Object data = onClientThread(() ->
+			{
+				Map<String, Object> result = new LinkedHashMap<>();
+				List<String> active = new ArrayList<>();
+				for (Prayer prayer : Prayer.values())
+				{
+					if (client.isPrayerActive(prayer))
+					{
+						active.add(prayer.name());
+					}
+				}
+				result.put("active", active);
+				result.put("activeCount", active.size());
+				result.put("prayerPoints", client.getBoostedSkillLevel(Skill.PRAYER));
+				result.put("maxPrayer", client.getRealSkillLevel(Skill.PRAYER));
+				return result;
+			});
+			sendJson(exchange, 200, data);
+		}
+		catch (Exception e)
+		{
+			sendError(exchange, 500, e.getMessage());
+		}
+	}
+
+	// --- Recording system ---
+
+	public boolean isRecording()
+	{
+		return isRecording;
+	}
+
+	public void addRecordingEvent(String eventType, Map<String, Object> data)
+	{
+		if (!isRecording)
+		{
+			return;
+		}
+		if (recordingBuffer.size() >= MAX_RECORDING_ENTRIES)
+		{
+			isRecording = false;
+			log.info("Recording auto-stopped: max entries ({}) reached", MAX_RECORDING_ENTRIES);
+			return;
+		}
+
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("eventType", eventType);
+		entry.put("tick", client.getTickCount());
+		entry.put("ticksElapsed", client.getTickCount() - recordingStartTick);
+		entry.put("timestamp", System.currentTimeMillis());
+		entry.putAll(data);
+		recordingBuffer.add(entry);
+	}
+
+	private void handleRecordingStart(HttpExchange exchange) throws IOException
+	{
+		if (!requireLoggedIn(exchange))
+		{
+			return;
+		}
+
+		try
+		{
+			Map<String, String> params = parseQuery(exchange.getRequestURI());
+			int durationSeconds = intParam(params, "duration", 180);
+			if (durationSeconds < 1) durationSeconds = 1;
+			if (durationSeconds > 600) durationSeconds = 600;
+
+			// Convert seconds to ticks (1 tick ≈ 0.6s)
+			final int maxTicks = (int) Math.ceil(durationSeconds / 0.6);
+
+			int startTick = onClientThread(() -> client.getTickCount());
+
+			synchronized (recordingBuffer)
+			{
+				recordingBuffer.clear();
+			}
+			recordingStartTick = startTick;
+			recordingMaxTicks = maxTicks;
+			recordingTickCounter = 0;
+			isRecording = true;
+
+			Map<String, Object> result = new LinkedHashMap<>();
+			result.put("status", "recording");
+			result.put("durationSeconds", durationSeconds);
+			result.put("maxTicks", maxTicks);
+			result.put("startTick", startTick);
+			sendJson(exchange, 200, result);
+
+			log.info("Recording started: {} seconds ({} ticks)", durationSeconds, maxTicks);
+		}
+		catch (Exception e)
+		{
+			sendError(exchange, 500, e.getMessage());
+		}
+	}
+
+	private void handleRecordingStop(HttpExchange exchange) throws IOException
+	{
+		boolean wasRecording = isRecording;
+		isRecording = false;
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("status", "stopped");
+		result.put("wasRecording", wasRecording);
+		result.put("eventsLogged", recordingBuffer.size());
+		sendJson(exchange, 200, result);
+
+		if (wasRecording)
+		{
+			log.info("Recording stopped: {} events captured", recordingBuffer.size());
+		}
+	}
+
+	private void handleRecordingStatus(HttpExchange exchange) throws IOException
+	{
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("recording", isRecording);
+		result.put("eventsLogged", recordingBuffer.size());
+		result.put("maxEntries", MAX_RECORDING_ENTRIES);
+		result.put("maxTicks", recordingMaxTicks);
+
+		if (isRecording)
+		{
+			try
+			{
+				int currentTick = onClientThread(() -> client.getTickCount());
+				result.put("ticksElapsed", currentTick - recordingStartTick);
+				result.put("secondsElapsed", (int) ((currentTick - recordingStartTick) * 0.6));
+				result.put("secondsRemaining", Math.max(0, (int) ((recordingMaxTicks - (currentTick - recordingStartTick)) * 0.6)));
+			}
+			catch (Exception ignored) {}
+		}
+		sendJson(exchange, 200, result);
+	}
+
+	private void handleRecordingData(HttpExchange exchange) throws IOException
+	{
+		Map<String, String> params = parseQuery(exchange.getRequestURI());
+		String typesFilter = params.get("types");
+		int fromTick = intParam(params, "from_tick", 0);
+		int toTick = intParam(params, "to_tick", 0);
+		int last = intParam(params, "last", 0);
+
+		List<Map<String, Object>> result;
+		synchronized (recordingBuffer)
+		{
+			result = new ArrayList<>(recordingBuffer);
+		}
+
+		// Filter by event types
+		if (typesFilter != null && !typesFilter.isEmpty())
+		{
+			Set<String> types = new HashSet<>(Arrays.asList(typesFilter.split(",")));
+			result.removeIf(e -> !types.contains(e.get("eventType")));
+		}
+
+		// Filter by tick range (using ticksElapsed)
+		if (fromTick > 0)
+		{
+			result.removeIf(e ->
+			{
+				Object te = e.get("ticksElapsed");
+				return te instanceof Number && ((Number) te).intValue() < fromTick;
+			});
+		}
+		if (toTick > 0)
+		{
+			result.removeIf(e ->
+			{
+				Object te = e.get("ticksElapsed");
+				return te instanceof Number && ((Number) te).intValue() > toTick;
+			});
+		}
+
+		// Last N events
+		if (last > 0 && result.size() > last)
+		{
+			result = result.subList(result.size() - last, result.size());
+		}
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("recording", isRecording);
+		response.put("totalEvents", recordingBuffer.size());
+		response.put("filteredEvents", result.size());
+		response.put("events", result);
+		sendJson(exchange, 200, response);
+	}
+
+	/**
+	 * Check if recording should auto-stop (called from plugin on each game tick).
+	 * Returns true if recording just auto-stopped.
+	 */
+	public boolean checkRecordingAutoStop(int currentTick)
+	{
+		if (!isRecording)
+		{
+			return false;
+		}
+		if (currentTick - recordingStartTick >= recordingMaxTicks)
+		{
+			isRecording = false;
+			log.info("Recording auto-stopped after {} ticks ({} events)", recordingMaxTicks, recordingBuffer.size());
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Should a game_tick event be recorded this tick? Throttles to every 3rd tick.
+	 */
+	public boolean shouldRecordGameTick()
+	{
+		if (!isRecording) return false;
+		recordingTickCounter++;
+		return recordingTickCounter % 3 == 0;
 	}
 
 	// --- Name search infrastructure ---

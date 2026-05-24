@@ -166,7 +166,7 @@ public class OsrsCompanionPlugin extends Plugin
 			dirty = true;
 		}
 
-		if (apiServer != null && apiServer.hasSseClients())
+		if (apiServer != null && (apiServer.hasSseClients() || apiServer.isRecording()))
 		{
 			Map<String, Object> data = new LinkedHashMap<>();
 			data.put("tick", client.getTickCount());
@@ -175,7 +175,9 @@ public class OsrsCompanionPlugin extends Plugin
 			data.put("level", event.getLevel());
 			data.put("boostedLevel", client.getBoostedSkillLevel(event.getSkill()));
 			data.put("xp", event.getXp());
-			apiServer.broadcastEvent("stat_changed", data);
+
+			if (apiServer.hasSseClients()) apiServer.broadcastEvent("stat_changed", data);
+			if (apiServer.isRecording()) apiServer.addRecordingEvent("stat_changed", data);
 		}
 	}
 
@@ -209,14 +211,16 @@ public class OsrsCompanionPlugin extends Plugin
 			containerName = "EQUIPMENT";
 		}
 
-		if (apiServer != null && apiServer.hasSseClients() && containerName != null)
+		if (apiServer != null && (apiServer.hasSseClients() || apiServer.isRecording()) && containerName != null)
 		{
 			Map<String, Object> data = new LinkedHashMap<>();
 			data.put("tick", client.getTickCount());
 			data.put("timestamp", System.currentTimeMillis());
 			data.put("container", containerName);
 			data.put("containerId", containerId);
-			apiServer.broadcastEvent("item_changed", data);
+
+			if (apiServer.hasSseClients()) apiServer.broadcastEvent("item_changed", data);
+			if (apiServer.isRecording()) apiServer.addRecordingEvent("item_changed", data);
 		}
 	}
 
@@ -302,8 +306,8 @@ public class OsrsCompanionPlugin extends Plugin
 				apiServer.addVarChange(entry);
 			}
 
-			// Broadcast SSE event
-			if (apiServer.hasSseClients())
+			// Broadcast SSE event and/or record
+			if (apiServer.hasSseClients() || apiServer.isRecording())
 			{
 				Map<String, Object> sseData = new LinkedHashMap<>();
 				sseData.put("tick", client.getTickCount());
@@ -311,7 +315,8 @@ public class OsrsCompanionPlugin extends Plugin
 				sseData.put("varpIndex", varpIndex);
 				sseData.put("oldValue", oldVal);
 				sseData.put("newValue", newVal);
-				apiServer.broadcastEvent("var_changed", sseData);
+				if (apiServer.hasSseClients()) apiServer.broadcastEvent("var_changed", sseData);
+				if (apiServer.isRecording()) apiServer.addRecordingEvent("var_changed", sseData);
 			}
 
 			System.arraycopy(currentVarps, 0, oldVarps, 0, oldVarps.length);
@@ -395,16 +400,39 @@ public class OsrsCompanionPlugin extends Plugin
 			doSave();
 		}
 
-		if (apiServer != null && apiServer.hasSseClients() && initialCollectionDone)
+		if (apiServer != null && initialCollectionDone && (apiServer.hasSseClients() || apiServer.isRecording()))
 		{
-			broadcastGameTick();
+			Map<String, Object> tickData = buildGameTickData();
+
+			if (apiServer.hasSseClients())
+			{
+				apiServer.broadcastEvent("game_tick", tickData);
+			}
+
+			// Recording: check auto-stop, then record game_tick every 3rd tick
+			apiServer.checkRecordingAutoStop(client.getTickCount());
+			if (apiServer.shouldRecordGameTick())
+			{
+				apiServer.addRecordingEvent("game_tick", tickData);
+			}
+
+			Set<Integer> activeInterfaces = new HashSet<>();
+			for (int groupId = 0; groupId < 800; groupId++)
+			{
+				net.runelite.api.widgets.Widget w = client.getWidget(groupId, 0);
+				if (w != null && !w.isSelfHidden())
+				{
+					activeInterfaces.add(groupId);
+				}
+			}
+			apiServer.updateActiveInterfaces(activeInterfaces);
 		}
 	}
 
 	@Subscribe
 	public void onHitsplatApplied(HitsplatApplied event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -421,13 +449,15 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("isMine", hitsplat.isMine());
 		data.put("isOthers", hitsplat.isOthers());
 		data.put("disappearsOnGameCycle", hitsplat.getDisappearsOnGameCycle());
-		apiServer.broadcastEvent("hitsplat", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("hitsplat", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("hitsplat", data);
 	}
 
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -438,13 +468,15 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("timestamp", System.currentTimeMillis());
 		data.put("actor", serializeActorBrief(actor));
 		data.put("animation", actor.getAnimation());
-		apiServer.broadcastEvent("animation_changed", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("animation_changed", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("animation_changed", data);
 	}
 
 	@Subscribe
 	public void onNpcSpawned(NpcSpawned event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -454,13 +486,15 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("tick", client.getTickCount());
 		data.put("timestamp", System.currentTimeMillis());
 		data.put("npc", serializeNpcBrief(npc));
-		apiServer.broadcastEvent("npc_spawned", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("npc_spawned", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("npc_spawned", data);
 	}
 
 	@Subscribe
 	public void onNpcDespawned(NpcDespawned event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -470,13 +504,15 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("tick", client.getTickCount());
 		data.put("timestamp", System.currentTimeMillis());
 		data.put("npc", serializeNpcBrief(npc));
-		apiServer.broadcastEvent("npc_despawned", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("npc_despawned", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("npc_despawned", data);
 	}
 
 	@Subscribe
 	public void onActorDeath(ActorDeath event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -485,13 +521,15 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("tick", client.getTickCount());
 		data.put("timestamp", System.currentTimeMillis());
 		data.put("actor", serializeActorBrief(event.getActor()));
-		apiServer.broadcastEvent("actor_death", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("actor_death", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("actor_death", data);
 	}
 
 	@Subscribe
 	public void onInteractingChanged(InteractingChanged event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -502,7 +540,9 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("source", serializeActorBrief(event.getSource()));
 		Actor target = event.getTarget();
 		data.put("target", target != null ? serializeActorBrief(target) : null);
-		apiServer.broadcastEvent("interacting_changed", data);
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("interacting_changed", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("interacting_changed", data);
 	}
 
 	@Subscribe
@@ -618,11 +658,9 @@ public class OsrsCompanionPlugin extends Plugin
 		interaction.put("menuAction", event.getMenuAction().name());
 		apiServer.addInteraction(interaction);
 
-		// Broadcast SSE only if there are active SSE clients
-		if (apiServer.hasSseClients())
-		{
-			apiServer.broadcastEvent("menu_clicked", data);
-		}
+		// Broadcast SSE and/or record
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("menu_clicked", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("menu_clicked", data);
 	}
 
 	@Subscribe
@@ -859,7 +897,7 @@ public class OsrsCompanionPlugin extends Plugin
 		syncTickThreshold = (int) (seconds / 0.6);
 	}
 
-	private void broadcastGameTick()
+	private Map<String, Object> buildGameTickData()
 	{
 		Map<String, Object> data = new LinkedHashMap<>();
 		data.put("tick", client.getTickCount());
@@ -892,21 +930,65 @@ public class OsrsCompanionPlugin extends Plugin
 				player.put("interacting", serializeActorBrief(interacting));
 			}
 
+			// Active prayers
+			List<String> activePrayers = new ArrayList<>();
+			for (Prayer prayer : Prayer.values())
+			{
+				if (client.isPrayerActive(prayer))
+				{
+					activePrayers.add(prayer.name());
+				}
+			}
+			if (!activePrayers.isEmpty())
+			{
+				player.put("activePrayers", activePrayers);
+			}
+
 			data.put("player", player);
 		}
 
-		apiServer.broadcastEvent("game_tick", data);
-
-		Set<Integer> activeInterfaces = new HashSet<>();
-		for (int groupId = 0; groupId < 800; groupId++)
+		// Nearby NPCs (compact: within 15 tiles)
+		if (local != null)
 		{
-			net.runelite.api.widgets.Widget w = client.getWidget(groupId, 0);
-			if (w != null && !w.isSelfHidden())
+			WorldPoint playerPos = local.getWorldLocation();
+			List<Map<String, Object>> nearbyNpcs = new ArrayList<>();
+			for (NPC npc : client.getNpcs())
 			{
-				activeInterfaces.add(groupId);
+				if (npc == null || npc.getName() == null) continue;
+				WorldPoint npcPos = npc.getWorldLocation();
+				if (npcPos == null) continue;
+				if (playerPos.distanceTo(npcPos) <= 15)
+				{
+					Map<String, Object> n = new LinkedHashMap<>();
+					n.put("id", npc.getId());
+					n.put("name", npc.getName());
+					Map<String, Object> pos = new LinkedHashMap<>();
+					pos.put("x", npcPos.getX());
+					pos.put("y", npcPos.getY());
+					n.put("pos", pos);
+					n.put("anim", npc.getAnimation());
+					int ratio = npc.getHealthRatio();
+					int scale = npc.getHealthScale();
+					if (ratio >= 0 && scale > 0)
+					{
+						n.put("hpRatio", ratio);
+						n.put("hpScale", scale);
+					}
+					Actor npcTarget = npc.getInteracting();
+					if (npcTarget != null)
+					{
+						n.put("interacting", npcTarget.getName());
+					}
+					nearbyNpcs.add(n);
+				}
+			}
+			if (!nearbyNpcs.isEmpty())
+			{
+				data.put("nearbyNpcs", nearbyNpcs);
 			}
 		}
-		apiServer.updateActiveInterfaces(activeInterfaces);
+
+		return data;
 	}
 
 	private Map<String, Object> serializeActorBrief(Actor actor)
