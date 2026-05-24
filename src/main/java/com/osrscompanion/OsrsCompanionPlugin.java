@@ -149,12 +149,14 @@ public class OsrsCompanionPlugin extends Plugin
 			}
 		}
 
-		if (apiServer != null && apiServer.hasSseClients())
+		if (apiServer != null && (apiServer.hasSseClients() || apiServer.isRecording()))
 		{
 			Map<String, Object> data = new LinkedHashMap<>();
+			data.put("tick", client.getTickCount());
 			data.put("timestamp", System.currentTimeMillis());
 			data.put("state", event.getGameState().name());
-			apiServer.broadcastEvent("game_state_changed", data);
+			if (apiServer.hasSseClients()) apiServer.broadcastEvent("game_state_changed", data);
+			if (apiServer.isRecording()) apiServer.addRecordingEvent("game_state_changed", data);
 		}
 	}
 
@@ -763,12 +765,16 @@ public class OsrsCompanionPlugin extends Plugin
 		{
 			apiServer.broadcastEvent("loot_received", drop);
 		}
+		if (apiServer.isRecording())
+		{
+			apiServer.addRecordingEvent("loot_received", drop);
+		}
 	}
 
 	@Subscribe
 	public void onSoundEffectPlayed(SoundEffectPlayed event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -778,13 +784,14 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("timestamp", System.currentTimeMillis());
 		data.put("soundId", event.getSoundId());
 		data.put("source", "EFFECT");
-		apiServer.broadcastEvent("sound_effect", data);
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("sound_effect", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("sound_effect", data);
 	}
 
 	@Subscribe
 	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event)
 	{
-		if (apiServer == null || !apiServer.hasSseClients())
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
 		{
 			return;
 		}
@@ -797,7 +804,8 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("sceneY", event.getSceneY());
 		data.put("range", event.getRange());
 		data.put("source", "AREA");
-		apiServer.broadcastEvent("sound_effect", data);
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("sound_effect", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("sound_effect", data);
 	}
 
 	@Subscribe
@@ -1149,6 +1157,20 @@ public class OsrsCompanionPlugin extends Plugin
 					{
 						n.put("interacting", npcTarget.getName());
 					}
+					try
+					{
+						short[] spriteIds = npc.getOverheadSpriteIds();
+						if (spriteIds != null && spriteIds.length > 0)
+						{
+							List<Integer> icons = new ArrayList<>();
+							for (short s : spriteIds)
+							{
+								icons.add((int) s);
+							}
+							n.put("overheadSpriteIds", icons);
+						}
+					}
+					catch (Exception ignored) {}
 					nearbyNpcs.add(n);
 				}
 			}

@@ -5,7 +5,7 @@ import { apiGet, apiPost, isApiError } from "../api.js";
 export function registerDebugTools(server: McpServer) {
   server.tool(
     "start_recording",
-    "Start recording game events for later analysis. Use this when the user says 'record the next X minutes', 'watch what happens', 'capture what's going on', or wants to debug a script over time. Records game events into a buffer that can be reviewed later.\n\nUse the 'types' parameter to filter which events are captured — this prevents the 10,000-entry buffer from filling up with noise.\n\nCommon presets:\n- Combat (full): game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created\n- Combat (lite): game_tick,hitsplat,actor_death,menu_clicked,projectile_spawned\n- Vars only: var_changed,game_tick\n- Clicks/movement: menu_clicked,game_tick\n- Full (default): omit types to record everything",
+    "Start recording game events for later analysis. Use this when the user says 'record the next X minutes', 'watch what happens', 'capture what's going on', or wants to debug a script over time. Records game events into a buffer that can be reviewed later.\n\nUse the 'types' parameter to filter which events are captured — this prevents the 10,000-entry buffer from filling up with noise.\n\nCommon presets:\n- Boss (full): game_tick,hitsplat,animation_changed,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created,sound_effect,chat_message,loot_received,game_state_changed\n- Combat (full): game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created,sound_effect\n- Combat (lite): game_tick,hitsplat,actor_death,menu_clicked,projectile_spawned\n- Vars only: var_changed,game_tick\n- Clicks/movement: menu_clicked,game_tick\n- Full (default): omit types to record everything",
     {
       duration: z
         .number()
@@ -20,7 +20,8 @@ export function registerDebugTools(server: McpServer) {
           "Comma-separated event types to record. Only these types will be captured. " +
           "Available: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, " +
           "actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed, " +
-          "object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message. " +
+          "object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message, " +
+          "sound_effect, loot_received, game_state_changed. " +
           "Omit to record all types."
         ),
     },
@@ -121,7 +122,7 @@ export function registerDebugTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Comma-separated event types to filter: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed, object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message"
+          "Comma-separated event types to filter: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed, object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message, sound_effect, loot_received, game_state_changed"
         ),
       from_tick: z
         .number()
@@ -302,6 +303,28 @@ export function registerDebugTools(server: McpServer) {
               const sender = e.sender ? `${e.sender}: ` : "";
               lines.push(
                 `  [+${tick}] CHAT — [${e.type}] ${sender}${e.message}`
+              );
+              break;
+            }
+            case "sound_effect": {
+              const src = e.source === "AREA" ? ` at scene(${e.sceneX},${e.sceneY})` : "";
+              lines.push(
+                `  [+${tick}] SFX — id:${e.soundId} (${e.source})${src}`
+              );
+              break;
+            }
+            case "loot_received": {
+              const itemList = (e.items || [])
+                .map((i: any) => `${i.quantity}x ${i.name || i.itemId}`)
+                .join(", ");
+              lines.push(
+                `  [+${tick}] LOOT — ${e.npcName} dropped: ${itemList}`
+              );
+              break;
+            }
+            case "game_state_changed": {
+              lines.push(
+                `  [+${tick}] STATE — ${e.state}`
               );
               break;
             }

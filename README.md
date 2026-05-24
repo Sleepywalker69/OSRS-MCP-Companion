@@ -76,10 +76,11 @@ The MCP server provides tools across six categories:
 | `recording_status` | Check recording progress — events captured, time remaining, active filter |
 | `get_recording` | Retrieve recorded timeline with filtering by event type and tick range |
 
-**16 recordable event types:** `game_tick`, `hitsplat`, `animation_changed`, `npc_spawned`, `npc_despawned`, `actor_death`, `var_changed`, `menu_clicked`, `stat_changed`, `item_changed`, `interacting_changed`, `object_spawned`, `object_despawned`, `projectile_spawned`, `gfx_created`, `chat_message`
+**19 recordable event types:** `game_tick`, `hitsplat`, `animation_changed`, `npc_spawned`, `npc_despawned`, `actor_death`, `var_changed`, `menu_clicked`, `stat_changed`, `item_changed`, `interacting_changed`, `object_spawned`, `object_despawned`, `projectile_spawned`, `gfx_created`, `chat_message`, `sound_effect`, `loot_received`, `game_state_changed`
 
 **Recording presets** (pass to `start_recording` types parameter):
-- **Combat (full):** `game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created`
+- **Boss (full):** `game_tick,hitsplat,animation_changed,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created,sound_effect,chat_message,loot_received,game_state_changed`
+- **Combat (full):** `game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created,sound_effect`
 - **Combat (lite):** `game_tick,hitsplat,actor_death,menu_clicked,projectile_spawned`
 - **Vars only:** `var_changed,game_tick`
 - **Clicks/movement:** `menu_clicked,game_tick`
