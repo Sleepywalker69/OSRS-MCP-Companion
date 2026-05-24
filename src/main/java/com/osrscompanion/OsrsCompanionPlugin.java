@@ -5,6 +5,7 @@ import com.google.inject.Provides;
 import com.osrscompanion.model.PlayerSyncData;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
 import net.runelite.client.events.NpcLootReceived;
@@ -334,7 +335,7 @@ public class OsrsCompanionPlugin extends Plugin
 				event.getMessage()
 			);
 
-			if (apiServer.hasSseClients())
+			if (apiServer.hasSseClients() || apiServer.isRecording())
 			{
 				Map<String, Object> data = new LinkedHashMap<>();
 				data.put("tick", client.getTickCount());
@@ -342,7 +343,9 @@ public class OsrsCompanionPlugin extends Plugin
 				data.put("type", event.getType().name());
 				data.put("sender", event.getName());
 				data.put("message", event.getMessage());
-				apiServer.broadcastEvent("chat_message", data);
+
+				if (apiServer.hasSseClients()) apiServer.broadcastEvent("chat_message", data);
+				if (apiServer.isRecording()) apiServer.addRecordingEvent("chat_message", data);
 			}
 		}
 	}
@@ -795,6 +798,161 @@ public class OsrsCompanionPlugin extends Plugin
 		data.put("range", event.getRange());
 		data.put("source", "AREA");
 		apiServer.broadcastEvent("sound_effect", data);
+	}
+
+	@Subscribe
+	public void onGameObjectSpawned(GameObjectSpawned event)
+	{
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
+		{
+			return;
+		}
+
+		GameObject go = event.getGameObject();
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("tick", client.getTickCount());
+		data.put("timestamp", System.currentTimeMillis());
+		data.put("objectId", go.getId());
+		try
+		{
+			ObjectComposition def = client.getObjectDefinition(go.getId());
+			data.put("objectName", def != null ? def.getName() : null);
+		}
+		catch (Exception e)
+		{
+			data.put("objectName", null);
+		}
+		WorldPoint wp = go.getWorldLocation();
+		if (wp != null)
+		{
+			Map<String, Object> pos = new LinkedHashMap<>();
+			pos.put("x", wp.getX());
+			pos.put("y", wp.getY());
+			pos.put("plane", wp.getPlane());
+			data.put("position", pos);
+		}
+		data.put("sizeX", go.sizeX());
+		data.put("sizeY", go.sizeY());
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("object_spawned", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("object_spawned", data);
+	}
+
+	@Subscribe
+	public void onGameObjectDespawned(GameObjectDespawned event)
+	{
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
+		{
+			return;
+		}
+
+		GameObject go = event.getGameObject();
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("tick", client.getTickCount());
+		data.put("timestamp", System.currentTimeMillis());
+		data.put("objectId", go.getId());
+		try
+		{
+			ObjectComposition def = client.getObjectDefinition(go.getId());
+			data.put("objectName", def != null ? def.getName() : null);
+		}
+		catch (Exception e)
+		{
+			data.put("objectName", null);
+		}
+		WorldPoint wp = go.getWorldLocation();
+		if (wp != null)
+		{
+			Map<String, Object> pos = new LinkedHashMap<>();
+			pos.put("x", wp.getX());
+			pos.put("y", wp.getY());
+			pos.put("plane", wp.getPlane());
+			data.put("position", pos);
+		}
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("object_despawned", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("object_despawned", data);
+	}
+
+	@Subscribe
+	public void onProjectileMoved(ProjectileMoved event)
+	{
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
+		{
+			return;
+		}
+
+		Projectile proj = event.getProjectile();
+
+		// Only record on first cycle (spawn), not every movement tick
+		if (client.getGameCycle() > proj.getStartCycle())
+		{
+			return;
+		}
+
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("tick", client.getTickCount());
+		data.put("timestamp", System.currentTimeMillis());
+		data.put("projectileId", proj.getId());
+		data.put("startCycle", proj.getStartCycle());
+		data.put("endCycle", proj.getEndCycle());
+		data.put("remainingCycles", proj.getRemainingCycles());
+
+		Actor target = proj.getInteracting();
+		if (target != null)
+		{
+			data.put("targetActor", serializeActorBrief(target));
+		}
+
+		WorldPoint targetPoint = null;
+		// If no actor target, compute the area target from the position
+		if (target == null)
+		{
+			int targetX = (int) proj.getX1();
+			int targetY = (int) proj.getY1();
+			LocalPoint lp = new LocalPoint(targetX, targetY);
+			targetPoint = WorldPoint.fromLocal(client, lp);
+		}
+		if (targetPoint != null)
+		{
+			Map<String, Object> tp = new LinkedHashMap<>();
+			tp.put("x", targetPoint.getX());
+			tp.put("y", targetPoint.getY());
+			tp.put("plane", targetPoint.getPlane());
+			data.put("targetPoint", tp);
+		}
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("projectile_spawned", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("projectile_spawned", data);
+	}
+
+	@Subscribe
+	public void onGraphicsObjectCreated(GraphicsObjectCreated event)
+	{
+		if (apiServer == null || (!apiServer.hasSseClients() && !apiServer.isRecording()))
+		{
+			return;
+		}
+
+		GraphicsObject gfx = event.getGraphicsObject();
+		Map<String, Object> data = new LinkedHashMap<>();
+		data.put("tick", client.getTickCount());
+		data.put("timestamp", System.currentTimeMillis());
+		data.put("graphicsId", gfx.getId());
+		data.put("startCycle", gfx.getStartCycle());
+
+		LocalPoint lp = gfx.getLocation();
+		if (lp != null)
+		{
+			Map<String, Object> pos = new LinkedHashMap<>();
+			pos.put("worldX", client.getBaseX() + lp.getSceneX());
+			pos.put("worldY", client.getBaseY() + lp.getSceneY());
+			pos.put("plane", client.getPlane());
+			data.put("position", pos);
+		}
+
+		if (apiServer.hasSseClients()) apiServer.broadcastEvent("gfx_created", data);
+		if (apiServer.isRecording()) apiServer.addRecordingEvent("gfx_created", data);
 	}
 
 	private void buildVarpToVarbitIndex()

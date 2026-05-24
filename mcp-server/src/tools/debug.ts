@@ -5,7 +5,7 @@ import { apiGet, apiPost, isApiError } from "../api.js";
 export function registerDebugTools(server: McpServer) {
   server.tool(
     "start_recording",
-    "Start recording game events for later analysis. Use this when the user says 'record the next X minutes', 'watch what happens', 'capture what's going on', or wants to debug a script over time. Records game events into a buffer that can be reviewed later.\n\nUse the 'types' parameter to filter which events are captured — this prevents the 10,000-entry buffer from filling up with noise.\n\nCommon presets:\n- Combat: game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked\n- Vars only: var_changed,game_tick\n- Clicks/movement: menu_clicked,game_tick\n- Full (default): omit types to record everything",
+    "Start recording game events for later analysis. Use this when the user says 'record the next X minutes', 'watch what happens', 'capture what's going on', or wants to debug a script over time. Records game events into a buffer that can be reviewed later.\n\nUse the 'types' parameter to filter which events are captured — this prevents the 10,000-entry buffer from filling up with noise.\n\nCommon presets:\n- Combat (full): game_tick,hitsplat,npc_spawned,npc_despawned,actor_death,menu_clicked,object_spawned,object_despawned,projectile_spawned,gfx_created\n- Combat (lite): game_tick,hitsplat,actor_death,menu_clicked,projectile_spawned\n- Vars only: var_changed,game_tick\n- Clicks/movement: menu_clicked,game_tick\n- Full (default): omit types to record everything",
     {
       duration: z
         .number()
@@ -19,7 +19,8 @@ export function registerDebugTools(server: McpServer) {
         .describe(
           "Comma-separated event types to record. Only these types will be captured. " +
           "Available: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, " +
-          "actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed. " +
+          "actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed, " +
+          "object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message. " +
           "Omit to record all types."
         ),
     },
@@ -120,7 +121,7 @@ export function registerDebugTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Comma-separated event types to filter: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed"
+          "Comma-separated event types to filter: game_tick, hitsplat, animation_changed, npc_spawned, npc_despawned, actor_death, var_changed, menu_clicked, stat_changed, item_changed, interacting_changed, object_spawned, object_despawned, projectile_spawned, gfx_created, chat_message"
         ),
       from_tick: z
         .number()
@@ -262,6 +263,45 @@ export function registerDebugTools(server: McpServer) {
               const tgt = e.target?.name || "nothing";
               lines.push(
                 `  [+${tick}] TARGET — ${src} → ${tgt}`
+              );
+              break;
+            }
+            case "object_spawned": {
+              const pos = e.position;
+              lines.push(
+                `  [+${tick}] OBJ+ — ${e.objectName || "?"} (id:${e.objectId}) at (${pos?.x},${pos?.y}) size:${e.sizeX}x${e.sizeY}`
+              );
+              break;
+            }
+            case "object_despawned": {
+              const pos = e.position;
+              lines.push(
+                `  [+${tick}] OBJ- — ${e.objectName || "?"} (id:${e.objectId}) at (${pos?.x},${pos?.y})`
+              );
+              break;
+            }
+            case "projectile_spawned": {
+              const tgt = e.targetActor
+                ? `→ ${e.targetActor.name}`
+                : e.targetPoint
+                  ? `→ tile (${e.targetPoint.x},${e.targetPoint.y})`
+                  : "";
+              lines.push(
+                `  [+${tick}] PROJ — id:${e.projectileId} ${tgt} cycles:${e.remainingCycles} remaining`
+              );
+              break;
+            }
+            case "gfx_created": {
+              const pos = e.position;
+              lines.push(
+                `  [+${tick}] GFX+ — id:${e.graphicsId} at (${pos?.worldX},${pos?.worldY})`
+              );
+              break;
+            }
+            case "chat_message": {
+              const sender = e.sender ? `${e.sender}: ` : "";
+              lines.push(
+                `  [+${tick}] CHAT — [${e.type}] ${sender}${e.message}`
               );
               break;
             }
