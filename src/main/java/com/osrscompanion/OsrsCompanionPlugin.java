@@ -115,6 +115,10 @@ public class OsrsCompanionPlugin extends Plugin
 			logCaptureAppender = null;
 		}
 
+		// Initialise UI scale BEFORE any Swing panels are created
+		UiScale.init(config.guiScale());
+		log.info("GUI scale factor: {} (config={})", UiScale.SCALE, config.guiScale());
+
 		if (config.enableApiServer())
 		{
 			startApiServer();
