@@ -35,6 +35,14 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      - name: Create and push tag (manual trigger only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag v${{ steps.version.outputs.VERSION }}
+          git push origin v${{ steps.version.outputs.VERSION }}
+
       - name: Build RuneLite plugin JAR
         run: |
           chmod +x gradlew
@@ -58,6 +66,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
           files: |
             build/libs/osrs-companion-${{ steps.version.outputs.VERSION }}-all.jar
             osrs-mcp-server-${{ steps.version.outputs.VERSION }}.zip
