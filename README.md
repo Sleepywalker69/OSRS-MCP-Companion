@@ -291,19 +291,19 @@ All 53 endpoints available at `http://127.0.0.1:8085`:
 
 ## Standalone GUI Window
 
-Click the **Open GUI** button in the RuneLite sidebar to launch a standalone 1100×720 window with 8 data tabs, a nav rail, live header status pills, and a footer status bar. The sidebar stays slim — just a brand header, the launch button, and a compact live-status block.
+Click the **Open GUI** button in the RuneLite sidebar to launch a standalone 1100×720 window with 8 data tabs, a nav rail, live header status pills, and a footer status bar. Supports standard minimize/maximize/close window controls. The sidebar stays slim — just a brand header, the launch button, and a compact live-status block.
 
 **Keyboard shortcuts:** `Ctrl+1-8` to switch tabs, `Esc` to close (state preserved, reopen from sidebar).
 
 | Tab | What it shows |
 |-----|--------------|
 | **Dashboard** | Two-column layout: player status bars (HP, prayer, run, spec) on the left; API server status, session summary, and quick action buttons (Save, Snapshot, Screenshot) on the right |
-| **Record** | Start/stop event recording with duration and event type selection. Includes presets (Boss, Combat, Lite, Vars, Clicks), a live progress bar, and a **recorded events viewer** with Load Events and Copy All buttons |
+| **Record** | Start/stop event recording with duration and event type selection. Includes presets (Boss, Combat, Lite, Vars, Clicks), a live progress bar, and a **recorded events viewer** with Load Events and Copy All buttons. Recordings auto-save to gzipped JSON on stop — click **Reveal file** to open the recordings folder |
 | **Actions** | Live feed of the ActionTracker — menu clicks, CS2 script callbacks, and inferred state changes. Filterable by source and searchable. Copy button for clipboard export |
 | **Chat** | Real-time chat viewer with type filtering (Game, Public, Private, Clan) and search. Color-coded by chat type. Copy button for clipboard export |
 | **Logs** | RuneLite console log viewer with level filtering (ERROR/WARN/INFO/DEBUG) and search. Stack traces on hover |
 | **Stats** | Session XP tracker with per-skill gains and XP/hr rates. Loot log with NPC grouping and item details. Copy button for clipboard export |
-| **Vars** | Varbit/varp change timeline — shows recent variable changes with type badges (orange for varbits, blue for varps), tick numbers, old/new values. Filterable and searchable by ID. Copy button for clipboard export |
+| **Vars** | Varbit/varp change timeline — shows recent variable changes with type badges (orange for varbits, blue for varps), tick numbers, old/new values with human-readable var names. Filterable and searchable by ID. **Exclude filters** let you hide noisy varps/varbits by ID (comma-separated). Copy button for clipboard export |
 | **Buffer** | Tick-level state buffer viewer with delta encoding. Shows entity spawns/despawns, HP changes, skill gains, and hitsplats between ticks |
 
 ## Configuration
@@ -321,6 +321,11 @@ Click the **Open GUI** button in the RuneLite sidebar to launch a standalone 110
 Player snapshots are saved periodically to:
 ```
 ~/.runelite/osrs-companion/{username}.json
+```
+
+Event recordings are auto-saved as gzipped JSON when stopped:
+```
+~/.runelite/osrs-companion/recordings/recording_{timestamp}.json.gz
 ```
 
 ## Privacy
