@@ -1,7 +1,7 @@
 package com.osrscompanion;
 
-import static com.osrscompanion.UiScale.sideFont;
 
+import com.osrscompanion.panels.PanelUtils;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
@@ -34,7 +34,7 @@ import java.awt.event.MouseEvent;
  * Sidebar launcher panel.
  *
  * The PluginPanel width is FIXED by RuneLite (~225px), so this file uses
- * literal pixel paddings — only font sizes scale (via sideFont()).
+ * literal pixel paddings and font sizes.
  * Scaling padding here would only steal width from the content.
  */
 public class OsrsCompanionPanel extends PluginPanel
@@ -113,12 +113,12 @@ public class OsrsCompanionPanel extends PluginPanel
 
 		JLabel name = new JLabel("MCP Companion");
 		name.setForeground(Color.WHITE);
-		name.setFont(name.getFont().deriveFont(Font.BOLD, sideFont(13f)));
+		name.setFont(new Font(PanelUtils.FONT_FAMILY, Font.BOLD, 14));
 		name.setAlignmentX(0);
 
 		JLabel meta = new JLabel("Port " + config.apiPort());
 		meta.setForeground(SUBTLE);
-		meta.setFont(meta.getFont().deriveFont(Font.PLAIN, sideFont(10f)));
+		meta.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, 11));
 		meta.setAlignmentX(0);
 
 		titles.add(name);
@@ -131,7 +131,7 @@ public class OsrsCompanionPanel extends PluginPanel
 	private JComponent buildOpenButton()
 	{
 		JButton open = new JButton("⤢  Open GUI");
-		open.setFont(open.getFont().deriveFont(Font.BOLD, sideFont(13f)));
+		open.setFont(new Font(PanelUtils.FONT_FAMILY, Font.BOLD, 14));
 		open.setForeground(new Color(0x1e, 0x1e, 0x1e));
 		open.setBackground(ColorScheme.BRAND_ORANGE);
 		open.setFocusPainted(false);
@@ -168,7 +168,7 @@ public class OsrsCompanionPanel extends PluginPanel
 		// API row gets a coloured dot prefix
 		JPanel apiRow = new JPanel(new BorderLayout(4, 0));
 		apiRow.setOpaque(false);
-		apiRow.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+		apiRow.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 		apiRow.setAlignmentX(0);
 		apiRow.add(keyLabel("API server"), BorderLayout.WEST);
 		JPanel apiRight = new JPanel();
@@ -194,7 +194,7 @@ public class OsrsCompanionPanel extends PluginPanel
 			"<html><body style='line-height:1.4'>All controls have moved to the GUI window. "
 			+ "Click <b>Open GUI</b> to launch.</body></html>");
 		hint.setForeground(HINT_FG);
-		hint.setFont(hint.getFont().deriveFont(Font.PLAIN, sideFont(10f)));
+		hint.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, 11));
 		hint.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(1, 0, 0, 0, ColorScheme.MEDIUM_GRAY_COLOR),
 			new EmptyBorder(10, 0, 0, 0)
@@ -282,7 +282,7 @@ public class OsrsCompanionPanel extends PluginPanel
 	{
 		JPanel row = new JPanel(new BorderLayout());
 		row.setOpaque(false);
-		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 		row.setAlignmentX(0);
 		row.add(keyLabel(key), BorderLayout.WEST);
 		row.add(value, BorderLayout.EAST);
@@ -293,7 +293,7 @@ public class OsrsCompanionPanel extends PluginPanel
 	{
 		JLabel l = new JLabel(text);
 		l.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		l.setFont(l.getFont().deriveFont(Font.PLAIN, sideFont(11f)));
+		l.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, 12));
 		return l;
 	}
 
@@ -301,7 +301,7 @@ public class OsrsCompanionPanel extends PluginPanel
 	{
 		JLabel l = new JLabel(text);
 		l.setForeground(Color.WHITE);
-		l.setFont(l.getFont().deriveFont(Font.PLAIN, sideFont(11f)));
+		l.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, 12));
 		return l;
 	}
 

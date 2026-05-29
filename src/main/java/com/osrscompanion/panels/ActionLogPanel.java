@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.ActionTracker;
 import com.osrscompanion.OsrsCompanionPlugin;
@@ -8,15 +7,16 @@ import net.runelite.client.ui.ColorScheme;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.text.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.util.List;
 
 /**
  * Action Log tab — scrollable, filterable view of the ActionTracker ring buffer.
- * Uses JTextPane + StyledDocument for native text selection and Ctrl+C.
- * Visual style matches mockup's action-table with semi-transparent source badges.
+ * Uses JTable for resizable columns and proper text selection.
  */
 public class ActionLogPanel extends JPanel
 {
@@ -24,148 +24,134 @@ public class ActionLogPanel extends JPanel
 
 	private final JComboBox<String> sourceFilter;
 	private final JTextField searchField;
-	private final JTextPane textPane;
+	private final JTable table;
+	private final DefaultTableModel tableModel;
 	private final JLabel footerLabel = new JLabel("—");
 	private final JLabel subtitleLabel;
 
-	// StyledDocument styles
-	private static final String STYLE_TICK    = "tick";
-	private static final String STYLE_ACTION  = "action";
-	private static final String STYLE_TARGET  = "target";
-	private static final String STYLE_DETAIL  = "detail";
-	private static final String STYLE_BADGE_MENU = "badge_menu";
-	private static final String STYLE_BADGE_SCRIPT = "badge_script";
-	private static final String STYLE_BADGE_INFER  = "badge_infer";
-	private static final String STYLE_HEADER  = "header";
+	private static final String[] COLUMNS = {"Tick", "Src", "Action", "Target", "Detail"};
 
 	public ActionLogPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header + filter bar ──────────────────────────────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		subtitleLabel = new JLabel("— / — in ring buffer");
 		subtitleLabel.setForeground(PanelUtils.SUBTITLE_FG);
-		subtitleLabel.setFont(subtitleLabel.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+		subtitleLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SUBTITLE));
 
 		JPanel head = PanelUtils.panelHead("Actions", "");
-		// Replace the subtitle with our dynamic one
-		head.remove(1); // remove the static subtitle
+		head.remove(1);
 		head.add(subtitleLabel, BorderLayout.EAST);
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		north.add(head);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Filter Bar ──────────────────────────────────────────────
-		JPanel filterBar = new JPanel(new BorderLayout(px(8), 0));
+		JPanel filterBar = new JPanel(new BorderLayout(8, 0));
 		filterBar.setOpaque(false);
 		filterBar.setAlignmentX(LEFT_ALIGNMENT);
-		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-		// Source filter buttons
-		JPanel sourceRow = new JPanel(new FlowLayout(FlowLayout.LEFT, px(4), 0));
+		JPanel sourceRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		sourceRow.setOpaque(false);
 
 		sourceFilter = new JComboBox<>(new String[]{"All", "menu", "script", "inferred"});
-		sourceFilter.setFont(sourceFilter.getFont().deriveFont(fontSize(10f)));
-		sourceFilter.setPreferredSize(new Dimension(px(85), px(24)));
+		sourceFilter.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		sourceFilter.setPreferredSize(new Dimension(85, 24));
 		sourceFilter.addActionListener(e -> refresh());
 		sourceRow.add(sourceFilter);
 
 		filterBar.add(sourceRow, BorderLayout.WEST);
 
 		searchField = new JTextField();
-		searchField.setFont(searchField.getFont().deriveFont(fontSize(11f)));
+		searchField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		searchField.setToolTipText("filter…");
 		searchField.addActionListener(e -> refresh());
 		filterBar.add(searchField, BorderLayout.CENTER);
 
-		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(4), 0));
+		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightBtns.setOpaque(false);
 		JButton copyBtn = PanelUtils.btn("Copy");
 		copyBtn.addActionListener(e -> copyActions());
 		rightBtns.add(copyBtn);
 		filterBar.add(rightBtns, BorderLayout.EAST);
 
-		add(filterBar);
-		add(PanelUtils.vgap(10));
+		north.add(filterBar);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Action table in a card ──────────────────────────────────
-		JPanel card = PanelUtils.card();
-		card.setLayout(new BorderLayout());
-		card.setAlignmentX(LEFT_ALIGNMENT);
+		add(north, BorderLayout.NORTH);
 
-		textPane = new JTextPane();
-		textPane.setEditable(false);
-		textPane.setBackground(PanelUtils.CARD_BG);
-		textPane.setFont(PanelUtils.monoFont(11f));
-		textPane.setForeground(Color.WHITE);
-		initStyles(textPane.getStyledDocument());
-		PanelUtils.installTextPopup(textPane);
+		// ── Action table ────────────────────────────────────────────
+		tableModel = new DefaultTableModel(COLUMNS, 0)
+		{
+			@Override
+			public boolean isCellEditable(int row, int column)
+			{
+				return false;
+			}
+		};
 
-		JScrollPane scroll = new JScrollPane(textPane);
-		scroll.setBorder(null);
+		table = new JTable(tableModel);
+		table.setBackground(PanelUtils.CARD_BG);
+		table.setForeground(Color.WHITE);
+		table.setGridColor(new Color(0x2a, 0x2a, 0x2a));
+		table.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
+		table.setRowHeight(20);
+		table.setShowHorizontalLines(true);
+		table.setShowVerticalLines(false);
+		table.setIntercellSpacing(new Dimension(4, 1));
+		table.setFillsViewportHeight(true);
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+		table.getTableHeader().setReorderingAllowed(false);
+		table.getTableHeader().setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		table.getTableHeader().setForeground(ColorScheme.BRAND_ORANGE);
+		table.getTableHeader().setFont(new Font(PanelUtils.FONT_FAMILY, Font.BOLD, (int) PanelUtils.FONT_SMALL));
+
+		// Column widths
+		setColumnWidth(table.getColumnModel().getColumn(0), 55, 55);   // Tick
+		setColumnWidth(table.getColumnModel().getColumn(1), 65, 65);   // Src
+		setColumnWidth(table.getColumnModel().getColumn(2), 140, 80);  // Action
+		setColumnWidth(table.getColumnModel().getColumn(3), 140, 80);  // Target
+		// Detail gets remaining space
+
+		// Source badge renderer
+		table.getColumnModel().getColumn(1).setCellRenderer(new SourceBadgeRenderer());
+
+		// Default renderer for other columns
+		DefaultTableCellRenderer defaultRenderer = new DefaultTableCellRenderer();
+		defaultRenderer.setBackground(PanelUtils.CARD_BG);
+		defaultRenderer.setForeground(Color.WHITE);
+		table.getColumnModel().getColumn(0).setCellRenderer(new TickRenderer());
+		table.getColumnModel().getColumn(2).setCellRenderer(defaultRenderer);
+		table.getColumnModel().getColumn(3).setCellRenderer(defaultRenderer);
+		table.getColumnModel().getColumn(4).setCellRenderer(new DetailRenderer());
+
+		JScrollPane scroll = new JScrollPane(table);
+		scroll.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1));
 		scroll.setBackground(PanelUtils.CARD_BG);
-		scroll.getVerticalScrollBar().setUnitIncrement(px(16));
-		card.add(scroll, BorderLayout.CENTER);
+		scroll.getViewport().setBackground(PanelUtils.CARD_BG);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
 
-		add(card);
-		add(PanelUtils.vgap(4));
+		add(scroll, BorderLayout.CENTER);
 
-		// ── Footer ──────────────────────────────────────────────────
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
-	private void initStyles(StyledDocument doc)
+	private void setColumnWidth(TableColumn col, int preferred, int min)
 	{
-		Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-
-		Style tick = doc.addStyle(STYLE_TICK, def);
-		StyleConstants.setForeground(tick, PanelUtils.MUTED);
-		StyleConstants.setFontFamily(tick, PanelUtils.monoFont(11f).getFamily());
-		StyleConstants.setFontSize(tick, (int) fontSize(11f));
-
-		Style action = doc.addStyle(STYLE_ACTION, def);
-		StyleConstants.setForeground(action, new Color(0xe0, 0xe0, 0xe0));
-		StyleConstants.setFontSize(action, (int) fontSize(11f));
-
-		Style target = doc.addStyle(STYLE_TARGET, def);
-		StyleConstants.setForeground(target, Color.WHITE);
-		StyleConstants.setFontSize(target, (int) fontSize(11f));
-
-		Style detail = doc.addStyle(STYLE_DETAIL, def);
-		StyleConstants.setForeground(detail, PanelUtils.MUTED);
-		StyleConstants.setFontSize(detail, (int) fontSize(11f));
-
-		// Badge styles with semi-transparent backgrounds
-		Style menuBadge = doc.addStyle(STYLE_BADGE_MENU, def);
-		StyleConstants.setForeground(menuBadge, PanelUtils.BADGE_GREEN.fg);
-		StyleConstants.setBackground(menuBadge, PanelUtils.BADGE_GREEN.bg);
-		StyleConstants.setBold(menuBadge, true);
-		StyleConstants.setFontSize(menuBadge, (int) fontSize(9f));
-
-		Style scriptBadge = doc.addStyle(STYLE_BADGE_SCRIPT, def);
-		StyleConstants.setForeground(scriptBadge, PanelUtils.BADGE_BLUE.fg);
-		StyleConstants.setBackground(scriptBadge, PanelUtils.BADGE_BLUE.bg);
-		StyleConstants.setBold(scriptBadge, true);
-		StyleConstants.setFontSize(scriptBadge, (int) fontSize(9f));
-
-		Style inferBadge = doc.addStyle(STYLE_BADGE_INFER, def);
-		StyleConstants.setForeground(inferBadge, PanelUtils.BADGE_YELLOW.fg);
-		StyleConstants.setBackground(inferBadge, PanelUtils.BADGE_YELLOW.bg);
-		StyleConstants.setBold(inferBadge, true);
-		StyleConstants.setFontSize(inferBadge, (int) fontSize(9f));
-
-		// Header row style
-		Style header = doc.addStyle(STYLE_HEADER, def);
-		StyleConstants.setForeground(header, ColorScheme.BRAND_ORANGE);
-		StyleConstants.setBold(header, true);
-		StyleConstants.setFontSize(header, (int) fontSize(10f));
+		col.setPreferredWidth(preferred);
+		col.setMinWidth(min);
 	}
 
 	public void refresh()
@@ -173,7 +159,7 @@ public class ActionLogPanel extends JPanel
 		ActionTracker tracker = plugin.getActionTracker();
 		if (tracker == null)
 		{
-			textPane.setText("");
+			tableModel.setRowCount(0);
 			footerLabel.setText("Action tracker not available");
 			subtitleLabel.setText("— / — in ring buffer");
 			return;
@@ -185,84 +171,32 @@ public class ActionLogPanel extends JPanel
 		String searchArg = search.isEmpty() ? null : search;
 
 		List<ActionTracker.TrackedAction> actions = tracker.getActions(100, sourceArg, searchArg);
-
 		subtitleLabel.setText(tracker.filled() + " / " + tracker.capacity() + " in ring buffer");
 
-		StyledDocument doc = textPane.getStyledDocument();
-		textPane.setText("");
-
-		try
+		tableModel.setRowCount(0);
+		for (int i = actions.size() - 1; i >= 0; i--)
 		{
-			// Header row
-			doc.insertString(doc.getLength(), "TICK    SRC       ACTION              TARGET              DETAIL\n",
-				doc.getStyle(STYLE_HEADER));
-
-			// Action rows (newest first)
-			for (int i = actions.size() - 1; i >= 0; i--)
+			ActionTracker.TrackedAction a = actions.get(i);
+			String detail = "";
+			if (a.details != null && !a.details.isEmpty())
 			{
-				ActionTracker.TrackedAction a = actions.get(i);
-				insertActionRow(doc, a);
+				detail = a.details.toString();
 			}
+			tableModel.addRow(new Object[]{
+				a.tick,
+				a.source,
+				a.action != null ? a.action : "",
+				a.target != null ? a.target : "—",
+				detail
+			});
 		}
-		catch (BadLocationException ignored) {}
 
 		footerLabel.setText(String.format("%d shown | %d / %d in buffer",
 			actions.size(), tracker.filled(), tracker.capacity()));
-
-		textPane.setCaretPosition(0);
-	}
-
-	private void insertActionRow(StyledDocument doc, ActionTracker.TrackedAction a) throws BadLocationException
-	{
-		// Tick
-		doc.insertString(doc.getLength(), String.format("%-7d ", a.tick), doc.getStyle(STYLE_TICK));
-
-		// Source badge
-		String badgeStyle;
-		switch (a.source)
-		{
-			case "menu":     badgeStyle = STYLE_BADGE_MENU;   break;
-			case "script":   badgeStyle = STYLE_BADGE_SCRIPT; break;
-			case "inferred": badgeStyle = STYLE_BADGE_INFER;  break;
-			default:         badgeStyle = STYLE_TICK;
-		}
-		String srcLabel = String.format(" %-6s ", a.source);
-		doc.insertString(doc.getLength(), srcLabel, doc.getStyle(badgeStyle));
-		doc.insertString(doc.getLength(), "  ", doc.getStyle(STYLE_TICK));
-
-		// Action
-		String actionText = a.action != null ? a.action : "";
-		if (actionText.length() > 20) actionText = actionText.substring(0, 17) + "...";
-		doc.insertString(doc.getLength(), String.format("%-20s", actionText), doc.getStyle(STYLE_ACTION));
-
-		// Target
-		String targetText = a.target != null ? a.target : "—";
-		if (targetText.length() > 20) targetText = targetText.substring(0, 17) + "...";
-		doc.insertString(doc.getLength(), String.format("%-20s", targetText), doc.getStyle(STYLE_TARGET));
-
-		// Detail (remaining info from details map)
-		String detail = "";
-		if (a.details != null && !a.details.isEmpty())
-		{
-			detail = a.details.toString();
-		}
-		if (detail.length() > 30) detail = detail.substring(0, 27) + "...";
-		doc.insertString(doc.getLength(), detail, doc.getStyle(STYLE_DETAIL));
-
-		doc.insertString(doc.getLength(), "\n", doc.getStyle(STYLE_TICK));
 	}
 
 	private void copyActions()
 	{
-		// If there's selected text, copy just that
-		String selected = textPane.getSelectedText();
-		if (selected != null && !selected.isEmpty())
-		{
-			textPane.copy();
-			return;
-		}
-
-		// Otherwise copy all as plain text
 		ActionTracker tracker = plugin.getActionTracker();
 		if (tracker == null) return;
 
@@ -278,9 +212,82 @@ public class ActionLogPanel extends JPanel
 		{
 			ActionTracker.TrackedAction a = actions.get(i);
 			sb.append("[+").append(a.tick).append("] [").append(a.source).append("] ")
-				.append(a.action).append(" | ").append(a.target).append("\n");
+				.append(a.action).append(" → ").append(a.target);
+			if (a.details != null && !a.details.isEmpty())
+			{
+				sb.append(" | ").append(a.details);
+			}
+			sb.append("\n");
 		}
 		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
 			new StringSelection(sb.toString()), null);
+	}
+
+	// ── Cell renderers ──────────────────────────────────────────────
+
+	private static class TickRenderer extends DefaultTableCellRenderer
+	{
+		@Override
+		public Component getTableCellRendererComponent(JTable t, Object value,
+			boolean isSelected, boolean hasFocus, int row, int column)
+		{
+			super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, column);
+			setForeground(PanelUtils.MUTED);
+			setBackground(isSelected ? t.getSelectionBackground() : PanelUtils.CARD_BG);
+			return this;
+		}
+	}
+
+	private static class SourceBadgeRenderer extends DefaultTableCellRenderer
+	{
+		@Override
+		public Component getTableCellRendererComponent(JTable t, Object value,
+			boolean isSelected, boolean hasFocus, int row, int column)
+		{
+			super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, column);
+			String src = value != null ? value.toString() : "";
+			setHorizontalAlignment(CENTER);
+			if (isSelected)
+			{
+				setBackground(t.getSelectionBackground());
+				setForeground(t.getSelectionForeground());
+			}
+			else
+			{
+				switch (src)
+				{
+					case "menu":
+						setForeground(PanelUtils.BADGE_GREEN.fg);
+						setBackground(PanelUtils.BADGE_GREEN.bg);
+						break;
+					case "script":
+						setForeground(PanelUtils.BADGE_BLUE.fg);
+						setBackground(PanelUtils.BADGE_BLUE.bg);
+						break;
+					case "inferred":
+						setForeground(PanelUtils.BADGE_YELLOW.fg);
+						setBackground(PanelUtils.BADGE_YELLOW.bg);
+						break;
+					default:
+						setForeground(PanelUtils.MUTED);
+						setBackground(PanelUtils.CARD_BG);
+				}
+			}
+			setFont(getFont().deriveFont(Font.BOLD));
+			return this;
+		}
+	}
+
+	private static class DetailRenderer extends DefaultTableCellRenderer
+	{
+		@Override
+		public Component getTableCellRendererComponent(JTable t, Object value,
+			boolean isSelected, boolean hasFocus, int row, int column)
+		{
+			super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, column);
+			setForeground(PanelUtils.MUTED);
+			setBackground(isSelected ? t.getSelectionBackground() : PanelUtils.CARD_BG);
+			return this;
+		}
 	}
 }

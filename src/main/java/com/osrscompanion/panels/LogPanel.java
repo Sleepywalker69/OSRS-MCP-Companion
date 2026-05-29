@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.LogCaptureAppender;
 import com.osrscompanion.OsrsCompanionPlugin;
@@ -43,54 +42,58 @@ public class LogPanel extends JPanel
 	public LogPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header + filter bar ──────────────────────────────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		JPanel head = PanelUtils.panelHead("Logs", "log4j tail · INFO and above");
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		north.add(head);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Filter Bar ──────────────────────────────────────────────
-		JPanel filterBar = new JPanel(new BorderLayout(px(8), 0));
+		JPanel filterBar = new JPanel(new BorderLayout(8, 0));
 		filterBar.setOpaque(false);
 		filterBar.setAlignmentX(LEFT_ALIGNMENT);
-		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
 		levelFilter = new JComboBox<>(new String[]{"ALL", "ERROR", "WARN", "INFO", "DEBUG"});
-		levelFilter.setFont(levelFilter.getFont().deriveFont(fontSize(10f)));
-		levelFilter.setPreferredSize(new Dimension(px(70), px(24)));
+		levelFilter.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		levelFilter.setPreferredSize(new Dimension(70, 24));
 		levelFilter.addActionListener(e -> refresh());
 		filterBar.add(levelFilter, BorderLayout.WEST);
 
 		searchField = new JTextField();
-		searchField.setFont(searchField.getFont().deriveFont(fontSize(11f)));
+		searchField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		searchField.setToolTipText("grep…");
 		searchField.addActionListener(e -> refresh());
 		filterBar.add(searchField, BorderLayout.CENTER);
 
-		add(filterBar);
+		north.add(filterBar);
 
 		autoScrollCb = new JCheckBox("auto-scroll", true);
-		autoScrollCb.setFont(autoScrollCb.getFont().deriveFont(fontSize(9f)));
+		autoScrollCb.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BADGE));
 		autoScrollCb.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		autoScrollCb.setBackground(PanelUtils.PAGE_BG);
 		autoScrollCb.setFocusPainted(false);
 		autoScrollCb.setAlignmentX(LEFT_ALIGNMENT);
-		add(autoScrollCb);
-		add(PanelUtils.vgap(10));
+		north.add(autoScrollCb);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Log pane card ───────────────────────────────────────────
+		add(north, BorderLayout.NORTH);
+
+		// ── CENTER: log pane card ───────────────────────────────────
 		JPanel card = PanelUtils.card();
 		card.setLayout(new BorderLayout());
-		card.setAlignmentX(LEFT_ALIGNMENT);
 
 		textPane = new JTextPane();
 		textPane.setEditable(false);
 		textPane.setBackground(PanelUtils.FEED_BG);
-		textPane.setFont(PanelUtils.monoFont(11f));
+		textPane.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
 		textPane.setForeground(Color.WHITE);
 		initStyles(textPane.getStyledDocument());
 		PanelUtils.installTextPopup(textPane);
@@ -98,37 +101,37 @@ public class LogPanel extends JPanel
 		JScrollPane scroll = new JScrollPane(textPane);
 		scroll.setBorder(null);
 		scroll.setBackground(PanelUtils.FEED_BG);
-		scroll.getVerticalScrollBar().setUnitIncrement(px(16));
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		card.add(scroll, BorderLayout.CENTER);
 
-		add(card);
-		add(PanelUtils.vgap(4));
+		add(card, BorderLayout.CENTER);
 
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
 	private void initStyles(StyledDocument doc)
 	{
 		Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-		Font mono = PanelUtils.monoFont(11f);
+		Font mono = PanelUtils.monoFont(PanelUtils.FONT_MONO);
 
 		Style time = doc.addStyle(S_TIME, def);
 		StyleConstants.setForeground(time, new Color(0x55, 0x55, 0x55));
 		StyleConstants.setFontFamily(time, mono.getFamily());
-		StyleConstants.setFontSize(time, (int) fontSize(10f));
+		StyleConstants.setFontSize(time, (int) PanelUtils.FONT_SMALL);
 
 		Style source = doc.addStyle(S_SOURCE, def);
 		StyleConstants.setForeground(source, PanelUtils.SOURCE_BLUE);
 		StyleConstants.setFontFamily(source, mono.getFamily());
-		StyleConstants.setFontSize(source, (int) fontSize(11f));
+		StyleConstants.setFontSize(source, (int) PanelUtils.FONT_MONO);
 
 		Style msg = doc.addStyle(S_MSG, def);
 		StyleConstants.setForeground(msg, new Color(0xdd, 0xdd, 0xdd));
 		StyleConstants.setFontFamily(msg, mono.getFamily());
-		StyleConstants.setFontSize(msg, (int) fontSize(11f));
+		StyleConstants.setFontSize(msg, (int) PanelUtils.FONT_MONO);
 
 		// Level badge styles
 		addLvlStyle(doc, S_LVL_DEBUG, PanelUtils.LOG_DEBUG);
@@ -144,7 +147,7 @@ public class LogPanel extends JPanel
 		StyleConstants.setForeground(s, bc.fg);
 		StyleConstants.setBackground(s, bc.bg);
 		StyleConstants.setBold(s, true);
-		StyleConstants.setFontSize(s, (int) fontSize(9f));
+		StyleConstants.setFontSize(s, (int) PanelUtils.FONT_BADGE);
 	}
 
 	public void refresh()
@@ -232,9 +235,15 @@ public class LogPanel extends JPanel
 		if (shortLogger.length() > 24) shortLogger = shortLogger.substring(0, 21) + "...";
 		doc.insertString(doc.getLength(), String.format("%-25s", shortLogger), doc.getStyle(S_SOURCE));
 
-		// Message
-		if (message.length() > 120) message = message.substring(0, 117) + "...";
+		// Message (full text, no truncation — JTextPane wraps naturally)
 		doc.insertString(doc.getLength(), message + "\n", doc.getStyle(S_MSG));
+
+		// Stack trace (if present)
+		if (entry.containsKey("throwable"))
+		{
+			String trace = String.valueOf(entry.get("throwable"));
+			doc.insertString(doc.getLength(), trace + "\n", doc.getStyle(S_MSG));
+		}
 	}
 
 	private boolean passesLevelFilter(String entryLevel, String filterLevel)

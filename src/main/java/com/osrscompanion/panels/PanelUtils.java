@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import net.runelite.client.ui.ColorScheme;
 
@@ -10,6 +9,7 @@ import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 
 /**
  * Shared visual building blocks for all GUI panels.
@@ -84,7 +84,32 @@ public final class PanelUtils
 		new Color(0xf4, 0x71, 0x68), new Color(44, 23, 22),   new Color(78, 37, 34));
 
 
+	// ── Font sizes (tune these for different monitor densities) ────
+	public static final float FONT_PAGE_TITLE  = 18f;   // panel head title
+	public static final float FONT_SUBTITLE    = 13f;   // panel head subtitle
+	public static final float FONT_CARD_HEADER = 12f;   // card section headers
+	public static final float FONT_BODY        = 13f;   // KV rows, body text
+	public static final float FONT_SMALL       = 12f;   // footers, secondary text
+	public static final float FONT_BADGE       = 10f;   // badge/tag labels
+	public static final float FONT_BTN         = 13f;   // button labels
+	public static final float FONT_MONO        = 13f;   // monospace feeds (default)
+	public static final float FONT_NAV         = 14f;   // nav rail labels
+	public static final float FONT_HEADER      = 16f;   // frame header title
+
+	/** Preferred UI font — Segoe UI on Windows, system default elsewhere. */
+	public static final String FONT_FAMILY = "Segoe UI";
+
 	private PanelUtils() {}
+
+	// ── RuneScape tag stripping ─────────────────────────────────────
+	private static final java.util.regex.Pattern RS_TAG_PATTERN =
+		java.util.regex.Pattern.compile("</?col[^>]*>|<br>", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+	public static String stripRsTags(String text)
+	{
+		if (text == null || text.isEmpty()) return text;
+		return RS_TAG_PATTERN.matcher(text).replaceAll("");
+	}
 
 	// ── Card container ──────────────────────────────────────────────
 	/** .card { background: #1e1e1e; border: 1px solid #000; padding: 12px 14px; } */
@@ -94,7 +119,7 @@ public final class PanelUtils
 		p.setBackground(CARD_BG);
 		p.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createLineBorder(Color.BLACK, 1),
-			new EmptyBorder(px(12), px(14), px(12), px(14))
+			new EmptyBorder(12, 14, 12, 14)
 		));
 		return p;
 	}
@@ -105,10 +130,10 @@ public final class PanelUtils
 	{
 		JLabel l = new JLabel(title.toUpperCase());
 		l.setForeground(ColorScheme.BRAND_ORANGE);
-		l.setFont(l.getFont().deriveFont(Font.BOLD, fontSize(11f)));
+		l.setFont(new Font(FONT_FAMILY, Font.BOLD, (int) FONT_CARD_HEADER));
 		l.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.MEDIUM_GRAY_COLOR),
-			new EmptyBorder(0, 0, px(6), 0)
+			new EmptyBorder(0, 0, 6, 0)
 		));
 		l.setAlignmentX(Component.LEFT_ALIGNMENT);
 		return l;
@@ -122,17 +147,17 @@ public final class PanelUtils
 		p.setOpaque(false);
 		p.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.MEDIUM_GRAY_COLOR),
-			new EmptyBorder(0, 0, px(10), 0)
+			new EmptyBorder(0, 0, 10, 0)
 		));
 
 		JLabel h = new JLabel(title);
 		h.setForeground(Color.WHITE);
-		h.setFont(h.getFont().deriveFont(Font.BOLD, fontSize(15f)));
+		h.setFont(new Font(FONT_FAMILY, Font.BOLD, (int) FONT_PAGE_TITLE));
 		p.add(h, BorderLayout.WEST);
 
 		JLabel sub = new JLabel(subtitle);
 		sub.setForeground(SUBTITLE_FG);
-		sub.setFont(sub.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+		sub.setFont(new Font(FONT_FAMILY, Font.PLAIN, (int) FONT_SUBTITLE));
 		p.add(sub, BorderLayout.EAST);
 
 		return p;
@@ -142,19 +167,20 @@ public final class PanelUtils
 	/** Single key-value row for use inside a card. Key is LIGHT_GRAY, value is WHITE. */
 	public static JPanel kvRow(String key, JLabel valueLabel)
 	{
-		JPanel row = new JPanel(new BorderLayout(px(12), 0));
+		JPanel row = new JPanel(new BorderLayout(12, 0));
 		row.setOpaque(false);
-		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(20)));
+		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JLabel k = new JLabel(key);
 		k.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		k.setFont(k.getFont().deriveFont(Font.PLAIN, fontSize(12f)));
-		k.setPreferredSize(new Dimension(px(110), px(18)));
+		k.setFont(new Font(FONT_FAMILY, Font.PLAIN, (int) FONT_BODY));
+		k.setPreferredSize(new Dimension(120, 20));
 		row.add(k, BorderLayout.WEST);
 
-		valueLabel.setFont(valueLabel.getFont().deriveFont(Font.PLAIN, fontSize(12f)));
+		valueLabel.setFont(new Font(FONT_FAMILY, Font.PLAIN, (int) FONT_BODY));
 		valueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+		valueLabel.setPreferredSize(new Dimension(0, 20));
 		row.add(valueLabel, BorderLayout.CENTER);
 
 		return row;
@@ -182,9 +208,9 @@ public final class PanelUtils
 		l.setForeground(colors.fg);
 		l.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createLineBorder(colors.border, 1),
-			new EmptyBorder(px(1), px(6), px(1), px(6))
+			new EmptyBorder(1, 6, 1, 6)
 		));
-		l.setFont(l.getFont().deriveFont(Font.BOLD, fontSize(9f)));
+		l.setFont(new Font(FONT_FAMILY, Font.BOLD, (int) FONT_BADGE));
 		l.setHorizontalAlignment(SwingConstants.CENTER);
 		return l;
 	}
@@ -194,13 +220,13 @@ public final class PanelUtils
 	public static JButton btn(String text)
 	{
 		JButton b = new JButton(text);
-		b.setFont(b.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+		b.setFont(new Font(FONT_FAMILY, Font.PLAIN, (int) FONT_BTN));
 		b.setFocusPainted(false);
 		b.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
 		b.setForeground(Color.WHITE);
 		b.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createLineBorder(Color.BLACK, 1),
-			new EmptyBorder(px(6), px(12), px(6), px(12))
+			new EmptyBorder(6, 12, 6, 12)
 		));
 		b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		addHover(b, ColorScheme.MEDIUM_GRAY_COLOR, new Color(0x4e, 0x4e, 0x4e));
@@ -216,7 +242,7 @@ public final class PanelUtils
 		b.setForeground(new Color(0x1e, 0x1e, 0x1e));
 		b.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createLineBorder(new Color(0xc4, 0x70, 0x08), 1),
-			new EmptyBorder(px(6), px(12), px(6), px(12))
+			new EmptyBorder(6, 12, 6, 12)
 		));
 		addHover(b, ColorScheme.BRAND_ORANGE, new Color(0xff, 0xae, 0x47));
 		return b;
@@ -241,13 +267,49 @@ public final class PanelUtils
 		});
 	}
 
+	/** Restyle a button as the active/selected option (orange, bold). */
+	public static void styleAsActive(JButton b)
+	{
+		b.setBackground(ColorScheme.BRAND_ORANGE);
+		b.setForeground(new Color(0x1e, 0x1e, 0x1e));
+		b.setFont(b.getFont().deriveFont(Font.BOLD));
+		b.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(new Color(0xc4, 0x70, 0x08), 1),
+			new EmptyBorder(6, 12, 6, 12)));
+		replaceHover(b, ColorScheme.BRAND_ORANGE, new Color(0xff, 0xae, 0x47));
+	}
+
+	/** Restyle a button as an inactive/unselected option (gray, plain). */
+	public static void styleAsInactive(JButton b)
+	{
+		b.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+		b.setForeground(Color.WHITE);
+		b.setFont(b.getFont().deriveFont(Font.PLAIN));
+		b.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(Color.BLACK, 1),
+			new EmptyBorder(6, 12, 6, 12)));
+		replaceHover(b, ColorScheme.MEDIUM_GRAY_COLOR, new Color(0x4e, 0x4e, 0x4e));
+	}
+
+	private static void replaceHover(JButton b, Color base, Color hover)
+	{
+		for (MouseListener ml : b.getMouseListeners())
+		{
+			if (ml instanceof MouseAdapter)
+			{
+				b.removeMouseListener(ml);
+			}
+		}
+		addHover(b, base, hover);
+	}
+
 	// ── Monospace font ──────────────────────────────────────────────
 	public static Font monoFont(float size)
 	{
-		Font f = new Font("Consolas", Font.PLAIN, (int) fontSize(size));
+		Font f = new Font("Consolas", Font.PLAIN, (int) size);
 		if (!"Consolas".equalsIgnoreCase(f.getFamily()))
 		{
-			f = new Font(Font.MONOSPACED, Font.PLAIN, (int) fontSize(size));
+			f = new Font(Font.MONOSPACED, Font.PLAIN, (int) size);
 		}
 		return f;
 	}
@@ -256,7 +318,7 @@ public final class PanelUtils
 	/** Two-column grid with gap, matching .grid-2 */
 	public static JPanel grid2(JComponent left, JComponent right)
 	{
-		JPanel p = new JPanel(new GridLayout(1, 2, px(14), 0));
+		JPanel p = new JPanel(new GridLayout(1, 2, 14, 0));
 		p.setOpaque(false);
 		p.add(left);
 		p.add(right);
@@ -266,7 +328,7 @@ public final class PanelUtils
 	/** Three-column grid with gap, matching .grid-3 */
 	public static JPanel grid3(JComponent a, JComponent b, JComponent c)
 	{
-		JPanel p = new JPanel(new GridLayout(1, 3, px(14), 0));
+		JPanel p = new JPanel(new GridLayout(1, 3, 14, 0));
 		p.setOpaque(false);
 		p.add(a);
 		p.add(b);
@@ -303,8 +365,8 @@ public final class PanelUtils
 			this.barColor = barColor;
 			this.label = "";
 			this.pct = 0f;
-			setPreferredSize(new Dimension(0, px(16)));
-			setMaximumSize(new Dimension(Integer.MAX_VALUE, px(16)));
+			setPreferredSize(new Dimension(0, 16));
+			setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
 			setBorder(BorderFactory.createLineBorder(Color.BLACK, 1));
 			setAlignmentX(Component.LEFT_ALIGNMENT);
 		}
@@ -346,7 +408,7 @@ public final class PanelUtils
 			}
 
 			// Centered text with shadow
-			g2.setFont(getFont().deriveFont(Font.BOLD, fontSize(10f)));
+			g2.setFont(new Font(FONT_FAMILY, Font.BOLD, (int) FONT_BADGE));
 			FontMetrics fm = g2.getFontMetrics();
 			int tx = (w - fm.stringWidth(label)) / 2;
 			int ty = (h - fm.getHeight()) / 2 + fm.getAscent();
@@ -381,13 +443,13 @@ public final class PanelUtils
 	// ── Vertical spacing shortcut ───────────────────────────────────
 	public static Component vgap(int pixels)
 	{
-		return Box.createVerticalStrut(px(pixels));
+		return Box.createVerticalStrut(pixels);
 	}
 
 	// ── Button row (FlowLayout LEFT) ────────────────────────────────
 	public static JPanel btnRow(JButton... buttons)
 	{
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, px(8), 0));
+		JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
 		row.setOpaque(false);
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 		for (JButton b : buttons)

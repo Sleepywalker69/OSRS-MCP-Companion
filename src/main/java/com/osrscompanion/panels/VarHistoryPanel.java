@@ -1,9 +1,9 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.GameStateServer;
 import com.osrscompanion.OsrsCompanionPlugin;
+import com.osrscompanion.VarNames;
 import net.runelite.client.ui.ColorScheme;
 
 import javax.swing.*;
@@ -13,8 +13,10 @@ import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Var History tab — timeline viewer for varbit/varp changes.
@@ -26,6 +28,8 @@ public class VarHistoryPanel extends JPanel
 
 	private final JComboBox<String> typeFilter;
 	private final JTextField searchField;
+	private final JTextField varpExcludeField;
+	private final JTextField varbitExcludeField;
 	private final JTextPane textPane;
 	private final JLabel footerLabel = new JLabel("—");
 
@@ -41,53 +45,92 @@ public class VarHistoryPanel extends JPanel
 	public VarHistoryPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header + filter bar ──────────────────────────────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		JPanel head = PanelUtils.panelHead("Vars", "varbit & varp change history");
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		north.add(head);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Filter Bar ──────────────────────────────────────────────
-		JPanel filterBar = new JPanel(new BorderLayout(px(8), 0));
+		JPanel filterBar = new JPanel(new BorderLayout(8, 0));
 		filterBar.setOpaque(false);
 		filterBar.setAlignmentX(LEFT_ALIGNMENT);
-		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
 		typeFilter = new JComboBox<>(new String[]{"All", "varbit", "varp"});
-		typeFilter.setFont(typeFilter.getFont().deriveFont(fontSize(10f)));
-		typeFilter.setPreferredSize(new Dimension(px(75), px(24)));
+		typeFilter.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		typeFilter.setPreferredSize(new Dimension(75, 24));
 		typeFilter.addActionListener(e -> refresh());
 		filterBar.add(typeFilter, BorderLayout.WEST);
 
 		searchField = new JTextField();
-		searchField.setFont(searchField.getFont().deriveFont(fontSize(11f)));
+		searchField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		searchField.setToolTipText("Search by ID...");
 		searchField.addActionListener(e -> refresh());
 		filterBar.add(searchField, BorderLayout.CENTER);
 
-		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(4), 0));
+		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightBtns.setOpaque(false);
 		JButton copyBtn = PanelUtils.btn("Copy");
 		copyBtn.addActionListener(e -> copyVarHistory());
 		rightBtns.add(copyBtn);
 		filterBar.add(rightBtns, BorderLayout.EAST);
 
-		add(filterBar);
-		add(PanelUtils.vgap(10));
+		north.add(filterBar);
+		north.add(PanelUtils.vgap(6));
 
-		// ── Var changes card ────────────────────────────────────────
+		// ── Exclude filter row ──────────────────────────────────────
+		JPanel excludeRow = new JPanel(new GridLayout(1, 2, 8, 0));
+		excludeRow.setOpaque(false);
+		excludeRow.setAlignmentX(LEFT_ALIGNMENT);
+		excludeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+
+		JPanel varpExcPanel = new JPanel(new BorderLayout(4, 0));
+		varpExcPanel.setOpaque(false);
+		JLabel varpExcLabel = new JLabel("Varp ×");
+		varpExcLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		varpExcLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		varpExcPanel.add(varpExcLabel, BorderLayout.WEST);
+		varpExcludeField = new JTextField();
+		varpExcludeField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		varpExcludeField.setToolTipText("Comma-separated varp IDs to hide (e.g. 3079, 83)");
+		varpExcludeField.addActionListener(e -> refresh());
+		varpExcPanel.add(varpExcludeField, BorderLayout.CENTER);
+		excludeRow.add(varpExcPanel);
+
+		JPanel varbitExcPanel = new JPanel(new BorderLayout(4, 0));
+		varbitExcPanel.setOpaque(false);
+		JLabel varbitExcLabel = new JLabel("Varbit ×");
+		varbitExcLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		varbitExcLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		varbitExcPanel.add(varbitExcLabel, BorderLayout.WEST);
+		varbitExcludeField = new JTextField();
+		varbitExcludeField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		varbitExcludeField.setToolTipText("Comma-separated varbit IDs to hide (e.g. 12392, 12391)");
+		varbitExcludeField.addActionListener(e -> refresh());
+		varbitExcPanel.add(varbitExcludeField, BorderLayout.CENTER);
+		excludeRow.add(varbitExcPanel);
+
+		north.add(excludeRow);
+		north.add(PanelUtils.vgap(10));
+
+		add(north, BorderLayout.NORTH);
+
+		// ── CENTER: var changes card ────────────────────────────────
 		JPanel card = PanelUtils.card();
 		card.setLayout(new BorderLayout());
-		card.setAlignmentX(LEFT_ALIGNMENT);
 
 		textPane = new JTextPane();
 		textPane.setEditable(false);
 		textPane.setBackground(PanelUtils.CARD_BG);
-		textPane.setFont(PanelUtils.monoFont(11f));
+		textPane.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
 		textPane.setForeground(Color.WHITE);
 		initStyles(textPane.getStyledDocument());
 		PanelUtils.installTextPopup(textPane);
@@ -95,37 +138,37 @@ public class VarHistoryPanel extends JPanel
 		JScrollPane scroll = new JScrollPane(textPane);
 		scroll.setBorder(null);
 		scroll.setBackground(PanelUtils.CARD_BG);
-		scroll.getVerticalScrollBar().setUnitIncrement(px(16));
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		card.add(scroll, BorderLayout.CENTER);
 
-		add(card);
-		add(PanelUtils.vgap(4));
+		add(card, BorderLayout.CENTER);
 
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
 	private void initStyles(StyledDocument doc)
 	{
 		Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-		Font mono = PanelUtils.monoFont(11f);
+		Font mono = PanelUtils.monoFont(PanelUtils.FONT_MONO);
 
 		Style time = doc.addStyle(S_TIME, def);
 		StyleConstants.setForeground(time, new Color(0x55, 0x55, 0x55));
 		StyleConstants.setFontFamily(time, mono.getFamily());
-		StyleConstants.setFontSize(time, (int) fontSize(10f));
+		StyleConstants.setFontSize(time, (int) PanelUtils.FONT_SMALL);
 
 		Style change = doc.addStyle(S_CHANGE, def);
 		StyleConstants.setForeground(change, Color.WHITE);
 		StyleConstants.setFontFamily(change, mono.getFamily());
-		StyleConstants.setFontSize(change, (int) fontSize(11f));
+		StyleConstants.setFontSize(change, (int) PanelUtils.FONT_MONO);
 
 		Style tick = doc.addStyle(S_TICK, def);
 		StyleConstants.setForeground(tick, ColorScheme.LIGHT_GRAY_COLOR);
 		StyleConstants.setFontFamily(tick, mono.getFamily());
-		StyleConstants.setFontSize(tick, (int) fontSize(9f));
+		StyleConstants.setFontSize(tick, (int) PanelUtils.FONT_BADGE);
 
 		// Badge styles
 		addBadge(doc, S_BADGE_VARBIT, PanelUtils.BADGE_ORANGE);
@@ -139,7 +182,7 @@ public class VarHistoryPanel extends JPanel
 		StyleConstants.setForeground(s, bc.fg);
 		StyleConstants.setBackground(s, bc.bg);
 		StyleConstants.setBold(s, true);
-		StyleConstants.setFontSize(s, (int) fontSize(9f));
+		StyleConstants.setFontSize(s, (int) PanelUtils.FONT_BADGE);
 	}
 
 	public void refresh()
@@ -155,11 +198,14 @@ public class VarHistoryPanel extends JPanel
 		List<Map<String, Object>> changes = server.getVarHistoryCopy();
 		String typeFilterVal = (String) typeFilter.getSelectedItem();
 		String searchVal = searchField.getText().trim();
+		Set<Integer> excludedVarps = parseIdList(varpExcludeField.getText());
+		Set<Integer> excludedVarbits = parseIdList(varbitExcludeField.getText());
 
 		StyledDocument doc = textPane.getStyledDocument();
 		textPane.setText("");
 
 		int shown = 0;
+		int excluded = 0;
 		try
 		{
 			for (int i = changes.size() - 1; i >= 0; i--)
@@ -170,8 +216,28 @@ public class VarHistoryPanel extends JPanel
 
 				if (!"All".equals(typeFilterVal) && !type.equals(typeFilterVal))
 					continue;
-				if (!searchVal.isEmpty() && !idStr.contains(searchVal))
+
+				// Exclude filter
+				int id = 0;
+				try { id = Integer.parseInt(idStr); } catch (NumberFormatException ignored2) {}
+				if ("varp".equals(type) && !excludedVarps.isEmpty() && excludedVarps.contains(id))
+				{
+					excluded++;
 					continue;
+				}
+				if ("varbit".equals(type) && !excludedVarbits.isEmpty() && excludedVarbits.contains(id))
+				{
+					excluded++;
+					continue;
+				}
+
+				if (!searchVal.isEmpty())
+				{
+					String varName = VarNames.lookup(type, id);
+					boolean matches = idStr.contains(searchVal)
+						|| (varName != null && varName.toLowerCase().contains(searchVal.toLowerCase()));
+					if (!matches) continue;
+				}
 
 				insertVarRow(doc, entry);
 				shown++;
@@ -180,8 +246,22 @@ public class VarHistoryPanel extends JPanel
 		}
 		catch (BadLocationException ignored) {}
 
-		footerLabel.setText(shown + " / " + changes.size() + " var changes");
+		String footerText = shown + " / " + changes.size() + " var changes";
+		if (excluded > 0) footerText += " (" + excluded + " excluded)";
+		footerLabel.setText(footerText);
 		textPane.setCaretPosition(0);
+	}
+
+	private Set<Integer> parseIdList(String text)
+	{
+		Set<Integer> ids = new HashSet<>();
+		if (text == null || text.trim().isEmpty()) return ids;
+		for (String part : text.split("[,\\s]+"))
+		{
+			try { ids.add(Integer.parseInt(part.trim())); }
+			catch (NumberFormatException ignored) {}
+		}
+		return ids;
 	}
 
 	private void insertVarRow(StyledDocument doc, Map<String, Object> entry) throws BadLocationException
@@ -205,9 +285,11 @@ public class VarHistoryPanel extends JPanel
 		doc.insertString(doc.getLength(), "  ", doc.getStyle(S_TIME));
 
 		// Change text
-		doc.insertString(doc.getLength(),
-			String.format("%s %d: %d → %d", type, id, oldVal, newVal),
-			doc.getStyle(S_CHANGE));
+		String varName = VarNames.lookup(type, id);
+		String changeText = varName != null
+			? String.format("%s %d (%s): %d → %d", type, id, varName, oldVal, newVal)
+			: String.format("%s %d: %d → %d", type, id, oldVal, newVal);
+		doc.insertString(doc.getLength(), changeText, doc.getStyle(S_CHANGE));
 
 		// Tick
 		doc.insertString(doc.getLength(), "  T" + tick, doc.getStyle(S_TICK));

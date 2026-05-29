@@ -1,17 +1,12 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.ActionTracker;
+import com.osrscompanion.ClientSnapshot;
 import com.osrscompanion.GameStateServer;
 import com.osrscompanion.OsrsCompanionConfig;
 import com.osrscompanion.OsrsCompanionPlugin;
 import com.osrscompanion.TickStateBuffer;
-import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.Player;
-import net.runelite.api.Skill;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.ColorScheme;
 
 import javax.swing.*;
@@ -25,9 +20,9 @@ import java.awt.datatransfer.StringSelection;
  */
 public class DashboardPanel extends JPanel
 {
-	private final Client client;
 	private final OsrsCompanionConfig config;
 	private final OsrsCompanionPlugin plugin;
+	private ClientSnapshot currentSnap;
 
 	// Player KV values
 	private final JLabel playerName  = PanelUtils.val("Not logged in");
@@ -58,41 +53,57 @@ public class DashboardPanel extends JPanel
 	private final JLabel saveSize   = PanelUtils.val("—");
 	private final JLabel saveWhen   = PanelUtils.val("—");
 
-	public DashboardPanel(Client client, OsrsCompanionConfig config, OsrsCompanionPlugin plugin)
+	public DashboardPanel(OsrsCompanionConfig config, OsrsCompanionPlugin plugin)
 	{
-		this.client = client;
 		this.config = config;
 		this.plugin = plugin;
 
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header ───────────────────────────────────────────
 		JPanel head = PanelUtils.panelHead("Dashboard", "refreshed every 3 ticks · 1.8s");
-		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(14));
+		head.setBorder(new EmptyBorder(0, 0, 14, 0));
+		add(head, BorderLayout.NORTH);
 
-		// ── Top row: grid-2 (Player + API) ──────────────────────────
+		// ── CENTER: scrollable body ─────────────────────────────────
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setBackground(PanelUtils.PAGE_BG);
+
+		// Top row: grid-2 (Player + API)
 		JPanel playerCard = buildPlayerCard();
 		JPanel apiCard    = buildApiCard();
 		JPanel topRow = PanelUtils.grid2(playerCard, apiCard);
 		topRow.setAlignmentX(LEFT_ALIGNMENT);
-		topRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(320)));
-		add(topRow);
-		add(PanelUtils.vgap(14));
+		topRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 320));
+		body.add(topRow);
+		body.add(PanelUtils.vgap(14));
 
-		// ── Bottom row: grid-3 (Recent actions, Skill deltas, Last save)
+		// Bottom row: grid-3 (Recent actions, Skill deltas, Last save)
 		JPanel actionsCard   = buildRecentActionsCard();
 		JPanel deltasCard    = buildSkillDeltasCard();
 		JPanel saveCard      = buildLastSaveCard();
 		JPanel bottomRow = PanelUtils.grid3(actionsCard, deltasCard, saveCard);
 		bottomRow.setAlignmentX(LEFT_ALIGNMENT);
-		bottomRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(240)));
-		add(bottomRow);
+		bottomRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 240));
+		body.add(bottomRow);
 
-		add(Box.createVerticalGlue());
+		JPanel bodyWrapper = new JPanel(new BorderLayout());
+		bodyWrapper.setBackground(PanelUtils.PAGE_BG);
+		bodyWrapper.add(body, BorderLayout.NORTH);
+
+		JScrollPane scroll = new JScrollPane(bodyWrapper,
+			JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(null);
+		scroll.setBackground(PanelUtils.PAGE_BG);
+		scroll.getViewport().setBackground(PanelUtils.PAGE_BG);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+		add(scroll, BorderLayout.CENTER);
+
 	}
 
 	// ── Player Card ─────────────────────────────────────────────────
@@ -191,10 +202,11 @@ public class DashboardPanel extends JPanel
 	}
 
 	// ── Refresh ─────────────────────────────────────────────────────
-	public void refresh()
+	public void refresh(ClientSnapshot snap)
 	{
+		this.currentSnap = snap;
 		// Player vitals
-		if (client.getGameState() != GameState.LOGGED_IN)
+		if (snap == null || !snap.loggedIn)
 		{
 			playerName.setText("Not logged in");
 			worldVal.setText("—");
@@ -207,32 +219,15 @@ public class DashboardPanel extends JPanel
 		}
 		else
 		{
-			Player local = client.getLocalPlayer();
-			if (local != null)
-			{
-				playerName.setText(local.getName() != null ? local.getName() : "Unknown");
-				combatVal.setText(String.valueOf(local.getCombatLevel()));
-				WorldPoint wp = local.getWorldLocation();
-				if (wp != null)
-				{
-					positionVal.setText(wp.getX() + ", " + wp.getY() + " (P" + wp.getPlane() + ")");
-				}
-			}
-			worldVal.setText("W" + client.getWorld());
+			playerName.setText(snap.playerName != null ? snap.playerName : "Unknown");
+			combatVal.setText(String.valueOf(snap.combatLevel));
+			positionVal.setText(snap.worldX + ", " + snap.worldY + " (P" + snap.plane + ")");
+			worldVal.setText("W" + snap.world);
 
-			int hp = client.getBoostedSkillLevel(Skill.HITPOINTS);
-			int maxHp = client.getRealSkillLevel(Skill.HITPOINTS);
-			hpBar.update(hp, maxHp, "HP");
-
-			int prayer = client.getBoostedSkillLevel(Skill.PRAYER);
-			int maxPrayer = client.getRealSkillLevel(Skill.PRAYER);
-			prayerBar.update(prayer, maxPrayer, "Prayer");
-
-			int run = client.getEnergy() / 100;
-			runBar.update(run, 100, "Run");
-
-			int spec = client.getVarpValue(48) / 10;
-			specBar.update(spec, 100, "Spec");
+			hpBar.update(snap.hp, snap.maxHp, "HP");
+			prayerBar.update(snap.prayer, snap.maxPrayer, "Prayer");
+			runBar.update(snap.runEnergy, 100, "Run");
+			specBar.update(snap.specEnergy, 100, "Spec");
 		}
 
 		// API status
@@ -259,7 +254,7 @@ public class DashboardPanel extends JPanel
 				uptimeVal.setText("—");
 			}
 
-			int totalXp = server.getTotalXpGained(client);
+			int totalXp = snap != null ? server.getTotalXpGained(snap.skillExperience) : 0;
 			xpSessionVal.setText("+" + String.format("%,d", totalXp));
 		}
 		else
@@ -305,20 +300,21 @@ public class DashboardPanel extends JPanel
 		for (int i = actions.size() - 1; i >= 0; i--)
 		{
 			ActionTracker.TrackedAction a = actions.get(i);
-			JPanel row = new JPanel(new BorderLayout(px(12), 0));
+			JPanel row = new JPanel(new BorderLayout(12, 0));
 			row.setOpaque(false);
-			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(18)));
+			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 			row.setAlignmentX(LEFT_ALIGNMENT);
 
 			JLabel tick = new JLabel(String.valueOf(a.tick));
 			tick.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			tick.setFont(tick.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
-			tick.setPreferredSize(new Dimension(px(36), px(16)));
+			tick.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
+			tick.setPreferredSize(new Dimension(36, 16));
 			row.add(tick, BorderLayout.WEST);
 
 			JLabel desc = new JLabel(a.action + " · " + a.target);
 			desc.setForeground(Color.WHITE);
-			desc.setFont(desc.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+			desc.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
+			desc.setPreferredSize(new Dimension(0, 16));
 			row.add(desc, BorderLayout.CENTER);
 
 			recentActionsContent.add(row);
@@ -335,7 +331,7 @@ public class DashboardPanel extends JPanel
 	{
 		skillDeltasContent.removeAll();
 		GameStateServer server = plugin.getApiServer();
-		if (server == null || client.getGameState() != GameState.LOGGED_IN)
+		if (server == null || currentSnap == null || !currentSnap.loggedIn)
 		{
 			skillDeltasContent.add(mutedLabel("No data"));
 			skillDeltasContent.revalidate();
@@ -345,27 +341,27 @@ public class DashboardPanel extends JPanel
 
 		java.util.Map<String, Integer> baselines = server.getXpBaselinesCopy();
 		int shown = 0;
-		for (Skill skill : Skill.values())
+		for (net.runelite.api.Skill skill : net.runelite.api.Skill.values())
 		{
-			if (skill == Skill.OVERALL || shown >= 5) continue;
+			if (skill == net.runelite.api.Skill.OVERALL || shown >= 5) continue;
 			Integer baseline = baselines.get(skill.name());
 			if (baseline == null) continue;
-			int gained = client.getSkillExperience(skill) - baseline;
+			int gained = currentSnap.getSkillExperience(skill) - baseline;
 			if (gained <= 0) continue;
 
-			JPanel row = new JPanel(new BorderLayout(px(12), 0));
+			JPanel row = new JPanel(new BorderLayout(12, 0));
 			row.setOpaque(false);
-			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(18)));
+			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 			row.setAlignmentX(LEFT_ALIGNMENT);
 
 			JLabel name = new JLabel(capitalize(skill.name()));
 			name.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			name.setFont(name.getFont().deriveFont(Font.PLAIN, fontSize(12f)));
+			name.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 			row.add(name, BorderLayout.WEST);
 
 			JLabel xp = new JLabel("+" + String.format("%,d", gained));
 			xp.setForeground(PanelUtils.GREEN);
-			xp.setFont(xp.getFont().deriveFont(Font.PLAIN, fontSize(12f)));
+			xp.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 			xp.setHorizontalAlignment(SwingConstants.RIGHT);
 			row.add(xp, BorderLayout.EAST);
 
@@ -388,7 +384,7 @@ public class DashboardPanel extends JPanel
 			saveStatus.setText("OK");
 			saveStatus.setForeground(PanelUtils.GREEN);
 			savePath.setText("~/.runelite/osrs-companion/");
-			savePath.setFont(savePath.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
+			savePath.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 		}
 		else
 		{
@@ -443,7 +439,7 @@ public class DashboardPanel extends JPanel
 	{
 		JLabel l = new JLabel(text);
 		l.setForeground(PanelUtils.MUTED);
-		l.setFont(l.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+		l.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
 	}

@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.OsrsCompanionPlugin;
 import com.osrscompanion.TickStateBuffer;
@@ -68,27 +67,31 @@ public class TickBufferPanel extends JPanel
 	public TickBufferPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header, summary cards, sparklines, controls ──────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		JPanel head = PanelUtils.panelHead("Tick buffer", "last 600 ticks · ~10 minutes");
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		north.add(head);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Summary cards (grid-3) ──────────────────────────────────
+		// Summary cards (grid-3)
 		JPanel capCard = buildCapacityCard();
 		JPanel hitCard = buildHitsplatCard();
 		JPanel denCard = buildDensityCard();
 		JPanel summaryRow = PanelUtils.grid3(capCard, hitCard, denCard);
 		summaryRow.setAlignmentX(LEFT_ALIGNMENT);
-		summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(180)));
-		add(summaryRow);
-		add(PanelUtils.vgap(10));
+		summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180));
+		north.add(summaryRow);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Sparkline card ──────────────────────────────────────────
+		// Sparkline card
 		JPanel sparkCard = PanelUtils.card();
 		sparkCard.setLayout(new BoxLayout(sparkCard, BoxLayout.Y_AXIS));
 		sparkCard.setAlignmentX(LEFT_ALIGNMENT);
@@ -110,36 +113,36 @@ public class TickBufferPanel extends JPanel
 		sparkCard.add(PanelUtils.vgap(4));
 		sparkCard.add(sparkRun);
 
-		add(sparkCard);
-		add(PanelUtils.vgap(10));
+		north.add(sparkCard);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Controls bar ────────────────────────────────────────────
-		JPanel controlBar = new JPanel(new BorderLayout(px(8), 0));
+		// Controls bar
+		JPanel controlBar = new JPanel(new BorderLayout(8, 0));
 		controlBar.setOpaque(false);
 		controlBar.setAlignmentX(LEFT_ALIGNMENT);
-		controlBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		controlBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-		JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, px(4), 0));
+		JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		leftControls.setOpaque(false);
 
 		JLabel tickLabel = new JLabel("Last");
 		tickLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		tickLabel.setFont(tickLabel.getFont().deriveFont(fontSize(10f)));
+		tickLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 		leftControls.add(tickLabel);
 
 		tickCountSpinner = new JSpinner(new SpinnerNumberModel(10, 2, 100, 5));
-		tickCountSpinner.setPreferredSize(new Dimension(px(55), px(22)));
-		tickCountSpinner.setFont(tickCountSpinner.getFont().deriveFont(fontSize(10f)));
+		tickCountSpinner.setPreferredSize(new Dimension(55, 22));
+		tickCountSpinner.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 		leftControls.add(tickCountSpinner);
 
 		JLabel ticksSuffix = new JLabel("ticks");
 		ticksSuffix.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		ticksSuffix.setFont(ticksSuffix.getFont().deriveFont(fontSize(10f)));
+		ticksSuffix.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 		leftControls.add(ticksSuffix);
 
 		controlBar.add(leftControls, BorderLayout.WEST);
 
-		JPanel filterChips = new JPanel(new FlowLayout(FlowLayout.LEFT, px(4), 0));
+		JPanel filterChips = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		filterChips.setOpaque(false);
 		showNpcs    = chip("NPCs", true);
 		showPlayers = chip("Players", true);
@@ -151,7 +154,7 @@ public class TickBufferPanel extends JPanel
 		filterChips.add(showHits);
 		controlBar.add(filterChips, BorderLayout.CENTER);
 
-		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(4), 0));
+		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightBtns.setOpaque(false);
 		JButton refreshBtn = PanelUtils.btn("Refresh");
 		refreshBtn.addActionListener(e -> refresh());
@@ -161,18 +164,19 @@ public class TickBufferPanel extends JPanel
 		rightBtns.add(copyBtn);
 		controlBar.add(rightBtns, BorderLayout.EAST);
 
-		add(controlBar);
-		add(PanelUtils.vgap(6));
+		north.add(controlBar);
+		north.add(PanelUtils.vgap(6));
 
-		// ── Delta viewer (JTextPane in card) ────────────────────────
+		add(north, BorderLayout.NORTH);
+
+		// ── CENTER: delta viewer (JTextPane in card) ────────────────
 		JPanel deltaCard = PanelUtils.card();
 		deltaCard.setLayout(new BorderLayout());
-		deltaCard.setAlignmentX(LEFT_ALIGNMENT);
 
 		textPane = new JTextPane();
 		textPane.setEditable(false);
 		textPane.setBackground(PanelUtils.CARD_BG);
-		textPane.setFont(PanelUtils.monoFont(11f));
+		textPane.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
 		textPane.setForeground(Color.WHITE);
 		initStyles(textPane.getStyledDocument());
 		PanelUtils.installTextPopup(textPane);
@@ -180,16 +184,16 @@ public class TickBufferPanel extends JPanel
 		JScrollPane scroll = new JScrollPane(textPane);
 		scroll.setBorder(null);
 		scroll.setBackground(PanelUtils.CARD_BG);
-		scroll.getVerticalScrollBar().setUnitIncrement(px(16));
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		deltaCard.add(scroll, BorderLayout.CENTER);
 
-		add(deltaCard);
-		add(PanelUtils.vgap(4));
+		add(deltaCard, BorderLayout.CENTER);
 
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
 	private JPanel buildCapacityCard()
@@ -234,32 +238,32 @@ public class TickBufferPanel extends JPanel
 	private void initStyles(StyledDocument doc)
 	{
 		Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-		Font mono = PanelUtils.monoFont(11f);
+		Font mono = PanelUtils.monoFont(PanelUtils.FONT_MONO);
 
 		Style tick = doc.addStyle(S_TICK, def);
 		StyleConstants.setForeground(tick, PanelUtils.MUTED);
 		StyleConstants.setFontFamily(tick, mono.getFamily());
-		StyleConstants.setFontSize(tick, (int) fontSize(10f));
+		StyleConstants.setFontSize(tick, (int) PanelUtils.FONT_SMALL);
 
 		Style added = doc.addStyle(S_ADDED, def);
 		StyleConstants.setForeground(added, ADDED_COLOR);
 		StyleConstants.setFontFamily(added, mono.getFamily());
-		StyleConstants.setFontSize(added, (int) fontSize(11f));
+		StyleConstants.setFontSize(added, (int) PanelUtils.FONT_MONO);
 
 		Style removed = doc.addStyle(S_REMOVED, def);
 		StyleConstants.setForeground(removed, REMOVED_COLOR);
 		StyleConstants.setFontFamily(removed, mono.getFamily());
-		StyleConstants.setFontSize(removed, (int) fontSize(11f));
+		StyleConstants.setFontSize(removed, (int) PanelUtils.FONT_MONO);
 
 		Style changed = doc.addStyle(S_CHANGED, def);
 		StyleConstants.setForeground(changed, CHANGED_COLOR);
 		StyleConstants.setFontFamily(changed, mono.getFamily());
-		StyleConstants.setFontSize(changed, (int) fontSize(11f));
+		StyleConstants.setFontSize(changed, (int) PanelUtils.FONT_MONO);
 
 		Style muted = doc.addStyle(S_MUTED, def);
 		StyleConstants.setForeground(muted, ColorScheme.LIGHT_GRAY_COLOR);
 		StyleConstants.setFontFamily(muted, mono.getFamily());
-		StyleConstants.setFontSize(muted, (int) fontSize(10f));
+		StyleConstants.setFontSize(muted, (int) PanelUtils.FONT_SMALL);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -617,7 +621,7 @@ public class TickBufferPanel extends JPanel
 	private static JCheckBox chip(String label, boolean selected)
 	{
 		JCheckBox cb = new JCheckBox(label, selected);
-		cb.setFont(cb.getFont().deriveFont(Font.PLAIN, fontSize(9f)));
+		cb.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BADGE));
 		cb.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		cb.setBackground(PanelUtils.PAGE_BG);
 		cb.setFocusPainted(false);
@@ -640,8 +644,8 @@ public class TickBufferPanel extends JPanel
 			this.label = label.toUpperCase();
 			this.lineColor = lineColor;
 			this.data = new float[0];
-			setPreferredSize(new Dimension(0, px(50)));
-			setMaximumSize(new Dimension(Integer.MAX_VALUE, px(50)));
+			setPreferredSize(new Dimension(0, 50));
+			setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
 			setAlignmentX(LEFT_ALIGNMENT);
 			setBackground(PanelUtils.FEED_BG);
 			setBorder(BorderFactory.createLineBorder(new Color(0x0a, 0x0a, 0x0a), 1));
@@ -661,19 +665,19 @@ public class TickBufferPanel extends JPanel
 			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
 			int w = getWidth(), h = getHeight();
-			int labelW = px(60);
+			int labelW = 60;
 			int chartX = labelW;
-			int chartW = w - labelW - px(4);
-			int axisH = px(12);  // space for X-axis labels
-			int chartH = h - px(4) - axisH;
-			int chartY = px(4);
+			int chartW = w - labelW - 4;
+			int axisH = 12;  // space for X-axis labels
+			int chartH = h - 4 - axisH;
+			int chartY = 4;
 
 			// Draw label
-			g2.setFont(getFont().deriveFont(Font.PLAIN, fontSize(10f)));
+			g2.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 			g2.setColor(ColorScheme.LIGHT_GRAY_COLOR);
 			FontMetrics fm = g2.getFontMetrics();
 			int ly = (h - fm.getHeight()) / 2 + fm.getAscent();
-			g2.drawString(label, px(6), ly);
+			g2.drawString(label, 6, ly);
 
 			// Draw chart area
 			if (data.length < 2 || chartW <= 0)
@@ -718,10 +722,10 @@ public class TickBufferPanel extends JPanel
 			g2.fillPolygon(fillX, fillY, data.length + 2);
 
 			// X-axis labels
-			g2.setFont(getFont().deriveFont(Font.PLAIN, fontSize(8f)));
+			g2.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BADGE));
 			g2.setColor(new Color(0x55, 0x55, 0x55));
 			FontMetrics axFm = g2.getFontMetrics();
-			int axY = chartY + chartH + axFm.getAscent() + px(2);
+			int axY = chartY + chartH + axFm.getAscent() + 2;
 			String[] axLabels = {"t-600", "t-450", "t-300", "t-150", "now"};
 			for (int i = 0; i < axLabels.length; i++)
 			{

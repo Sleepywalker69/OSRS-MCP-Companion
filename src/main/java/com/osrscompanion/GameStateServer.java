@@ -92,6 +92,7 @@ public class GameStateServer
 	private static final int MAX_RECORDING_ENTRIES = 10_000;
 	private int recordingTickCounter = 0; // for throttling game_tick recordings
 	private Set<String> recordingEventFilter = null; // null = record all types
+	private volatile java.io.File lastRecordingFile;
 
 	private static final Map<Integer, String> KNOWN_INTERFACES;
 	static
@@ -3972,7 +3973,7 @@ public class GameStateServer
 	/**
 	 * Get total XP gained this session across all skills.
 	 */
-	public int getTotalXpGained(Client clientRef)
+	public int getTotalXpGained(int[] skillExperience)
 	{
 		int total = 0;
 		Map<String, Integer> baselines = getXpBaselinesCopy();
@@ -3982,7 +3983,7 @@ public class GameStateServer
 			Integer baseline = baselines.get(skill.name());
 			if (baseline != null)
 			{
-				int current = clientRef.getSkillExperience(skill);
+				int current = skillExperience[skill.ordinal()];
 				int gained = current - baseline;
 				if (gained > 0) total += gained;
 			}
@@ -4076,8 +4077,46 @@ public class GameStateServer
 		isRecording = false;
 		if (wasRecording)
 		{
+			exportRecordingToFile();
 			log.info("Recording stopped from panel: {} events captured", recordingBuffer.size());
 		}
+	}
+
+	/**
+	 * Export the current recording buffer to a gzipped JSON file.
+	 */
+	public java.io.File exportRecordingToFile()
+	{
+		List<Map<String, Object>> snapshot;
+		synchronized (recordingBuffer)
+		{
+			snapshot = new ArrayList<>(recordingBuffer);
+		}
+		if (snapshot.isEmpty()) return null;
+
+		java.io.File dir = new java.io.File(System.getProperty("user.home"), ".runelite/osrs-companion/recordings");
+		dir.mkdirs();
+		String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+		java.io.File file = new java.io.File(dir, "recording_" + timestamp + ".json.gz");
+
+		try (java.util.zip.GZIPOutputStream gzOut = new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(file));
+			 java.io.OutputStreamWriter writer = new java.io.OutputStreamWriter(gzOut, java.nio.charset.StandardCharsets.UTF_8))
+		{
+			compactGson.toJson(snapshot, writer);
+		}
+		catch (Exception e)
+		{
+			log.warn("Failed to export recording to {}", file.getAbsolutePath(), e);
+			return null;
+		}
+		lastRecordingFile = file;
+		log.info("Recording exported to {} ({} events, {} bytes)", file.getAbsolutePath(), snapshot.size(), file.length());
+		return file;
+	}
+
+	public java.io.File getLastRecordingFile()
+	{
+		return lastRecordingFile;
 	}
 
 	/**

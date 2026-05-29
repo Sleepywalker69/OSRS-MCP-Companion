@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.GameStateServer;
 import com.osrscompanion.OsrsCompanionPlugin;
@@ -48,69 +47,73 @@ public class ChatPanel extends JPanel
 	public ChatPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header + filter bar ──────────────────────────────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		subtitleLabel = new JLabel("0 messages · live tail");
 		subtitleLabel.setForeground(PanelUtils.SUBTITLE_FG);
-		subtitleLabel.setFont(subtitleLabel.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+		subtitleLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SUBTITLE));
 		JPanel head = PanelUtils.panelHead("Chat", "");
 		head.remove(1);
 		head.add(subtitleLabel, BorderLayout.EAST);
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		north.add(head);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Filter Bar ──────────────────────────────────────────────
-		JPanel filterBar = new JPanel(new BorderLayout(px(8), 0));
+		JPanel filterBar = new JPanel(new BorderLayout(8, 0));
 		filterBar.setOpaque(false);
 		filterBar.setAlignmentX(LEFT_ALIGNMENT);
-		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		filterBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
 		typeFilter = new JComboBox<>(new String[]{
 			"All", "GAMEMESSAGE", "PUBLICCHAT", "PRIVATECHAT",
 			"PRIVATECHATOUT", "FRIENDSCHAT", "CLAN_CHAT", "TRADE"
 		});
-		typeFilter.setFont(typeFilter.getFont().deriveFont(fontSize(10f)));
-		typeFilter.setPreferredSize(new Dimension(px(100), px(24)));
+		typeFilter.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		typeFilter.setPreferredSize(new Dimension(100, 24));
 		typeFilter.addActionListener(e -> refresh());
 		filterBar.add(typeFilter, BorderLayout.WEST);
 
 		searchField = new JTextField();
-		searchField.setFont(searchField.getFont().deriveFont(fontSize(11f)));
+		searchField.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		searchField.setToolTipText("Search messages...");
 		searchField.addActionListener(e -> refresh());
 		filterBar.add(searchField, BorderLayout.CENTER);
 
-		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(4), 0));
+		JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		rightBtns.setOpaque(false);
 		JButton copyBtn = PanelUtils.btn("Copy");
 		copyBtn.addActionListener(e -> copyMessages());
 		rightBtns.add(copyBtn);
 		filterBar.add(rightBtns, BorderLayout.EAST);
 
-		add(filterBar);
+		north.add(filterBar);
 
 		autoScrollCb = new JCheckBox("Auto-scroll", true);
-		autoScrollCb.setFont(autoScrollCb.getFont().deriveFont(fontSize(9f)));
+		autoScrollCb.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BADGE));
 		autoScrollCb.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		autoScrollCb.setBackground(PanelUtils.PAGE_BG);
 		autoScrollCb.setFocusPainted(false);
 		autoScrollCb.setAlignmentX(LEFT_ALIGNMENT);
-		add(autoScrollCb);
-		add(PanelUtils.vgap(10));
+		north.add(autoScrollCb);
+		north.add(PanelUtils.vgap(10));
 
-		// ── Chat feed card ──────────────────────────────────────────
+		add(north, BorderLayout.NORTH);
+
+		// ── CENTER: chat feed card ──────────────────────────────────
 		JPanel card = PanelUtils.card();
 		card.setLayout(new BorderLayout());
-		card.setAlignmentX(LEFT_ALIGNMENT);
 
 		textPane = new JTextPane();
 		textPane.setEditable(false);
 		textPane.setBackground(PanelUtils.FEED_BG);
-		textPane.setFont(PanelUtils.monoFont(11f));
+		textPane.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
 		textPane.setForeground(Color.WHITE);
 		initStyles(textPane.getStyledDocument());
 		PanelUtils.installTextPopup(textPane);
@@ -118,38 +121,38 @@ public class ChatPanel extends JPanel
 		JScrollPane scroll = new JScrollPane(textPane);
 		scroll.setBorder(null);
 		scroll.setBackground(PanelUtils.FEED_BG);
-		scroll.getVerticalScrollBar().setUnitIncrement(px(16));
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		card.add(scroll, BorderLayout.CENTER);
 
-		add(card);
-		add(PanelUtils.vgap(4));
+		add(card, BorderLayout.CENTER);
 
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
 	private void initStyles(StyledDocument doc)
 	{
 		Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-		Font mono = PanelUtils.monoFont(11f);
+		Font mono = PanelUtils.monoFont(PanelUtils.FONT_MONO);
 
 		Style time = doc.addStyle(S_TIME, def);
 		StyleConstants.setForeground(time, new Color(0x55, 0x55, 0x55));
 		StyleConstants.setFontFamily(time, mono.getFamily());
-		StyleConstants.setFontSize(time, (int) fontSize(10f));
+		StyleConstants.setFontSize(time, (int) PanelUtils.FONT_SMALL);
 
 		Style sender = doc.addStyle(S_SENDER, def);
 		StyleConstants.setForeground(sender, PanelUtils.GOLD);
 		StyleConstants.setBold(sender, true);
 		StyleConstants.setFontFamily(sender, mono.getFamily());
-		StyleConstants.setFontSize(sender, (int) fontSize(11f));
+		StyleConstants.setFontSize(sender, (int) PanelUtils.FONT_MONO);
 
 		Style body = doc.addStyle(S_BODY, def);
 		StyleConstants.setForeground(body, new Color(0xdd, 0xdd, 0xdd));
 		StyleConstants.setFontFamily(body, mono.getFamily());
-		StyleConstants.setFontSize(body, (int) fontSize(11f));
+		StyleConstants.setFontSize(body, (int) PanelUtils.FONT_MONO);
 
 		// Badge styles per chat type
 		addBadgeStyle(doc, S_BADGE_GAME,   PanelUtils.CHAT_GAME);
@@ -168,7 +171,7 @@ public class ChatPanel extends JPanel
 		StyleConstants.setForeground(s, bc.fg);
 		StyleConstants.setBackground(s, bc.bg);
 		StyleConstants.setBold(s, true);
-		StyleConstants.setFontSize(s, (int) fontSize(9f));
+		StyleConstants.setFontSize(s, (int) PanelUtils.FONT_BADGE);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -196,7 +199,7 @@ public class ChatPanel extends JPanel
 			for (Map<String, Object> msg : messages)
 			{
 				String type = String.valueOf(msg.getOrDefault("type", ""));
-				String text = String.valueOf(msg.getOrDefault("message", ""));
+				String text = PanelUtils.stripRsTags(String.valueOf(msg.getOrDefault("message", "")));
 				String senderName = msg.containsKey("sender") ? String.valueOf(msg.get("sender")) : null;
 				long timestamp = msg.containsKey("timestamp") ? ((Number) msg.get("timestamp")).longValue() : 0;
 
@@ -296,7 +299,7 @@ public class ChatPanel extends JPanel
 		for (Map<String, Object> msg : messages)
 		{
 			String type = String.valueOf(msg.getOrDefault("type", ""));
-			String text = String.valueOf(msg.getOrDefault("message", ""));
+			String text = PanelUtils.stripRsTags(String.valueOf(msg.getOrDefault("message", "")));
 			String sender = msg.containsKey("sender") ? String.valueOf(msg.get("sender")) : "";
 			long ts = msg.containsKey("timestamp") ? ((Number) msg.get("timestamp")).longValue() : 0;
 			String time = ts > 0 ? TIME_FORMAT.format(new Date(ts)) : "??:??:??";

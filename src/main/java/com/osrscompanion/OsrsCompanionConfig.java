@@ -39,18 +39,6 @@ public interface OsrsCompanionConfig extends Config
 		return 8085;
 	}
 
-	@ConfigItem(
-		keyName = "guiScale",
-		name = "GUI Scale",
-		description = "Scale factor for the standalone GUI window. 1.0 = native (recommended). Try 1.25 or 1.5 only if everything looks tiny.",
-		section = apiSection,
-		position = 2
-	)
-	default double guiScale()
-	{
-		return 1.0;
-	}
-
 	@ConfigSection(
 		name = "File Export",
 		description = "Periodic JSON file export settings",

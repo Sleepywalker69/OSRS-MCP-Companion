@@ -1,12 +1,10 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
+import com.osrscompanion.ClientSnapshot;
 import com.osrscompanion.GameStateServer;
 import com.osrscompanion.OsrsCompanionPlugin;
-import net.runelite.api.Client;
 import net.runelite.api.Experience;
-import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.client.ui.ColorScheme;
 
@@ -24,7 +22,6 @@ import java.util.Map;
  */
 public class StatsPanel extends JPanel
 {
-	private final Client client;
 	private final OsrsCompanionPlugin plugin;
 
 	// 3-column skill grid
@@ -61,26 +58,29 @@ public class StatsPanel extends JPanel
 		Skill.CONSTRUCTION, Skill.HUNTER
 	};
 
-	public StatsPanel(Client client, OsrsCompanionPlugin plugin)
+	public StatsPanel(OsrsCompanionPlugin plugin)
 	{
-		this.client = client;
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header ───────────────────────────────────────────
 		JPanel head = PanelUtils.panelHead("Stats", "23 skills · session deltas");
-		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(10));
+		head.setBorder(new EmptyBorder(0, 0, 10, 0));
+		add(head, BorderLayout.NORTH);
 
-		// ── Skill grid (3 columns) ──────────────────────────────────
-		skillGrid = new JPanel(new GridLayout(0, 3, px(4), px(4)));
+		// ── CENTER: scrollable body ─────────────────────────────────
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setBackground(PanelUtils.PAGE_BG);
+
+		// Skill grid (3 columns)
+		skillGrid = new JPanel(new GridLayout(0, 3, 4, 4));
 		skillGrid.setBackground(PanelUtils.CARD_BG);
 		skillGrid.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createLineBorder(Color.BLACK, 1),
-			new EmptyBorder(px(6), px(6), px(6), px(6))
+			new EmptyBorder(6, 6, 6, 6)
 		));
 		skillGrid.setAlignmentX(LEFT_ALIGNMENT);
 
@@ -91,10 +91,10 @@ public class StatsPanel extends JPanel
 			skillGrid.add(skillCells[i]);
 		}
 
-		add(skillGrid);
-		add(PanelUtils.vgap(10));
+		body.add(skillGrid);
+		body.add(PanelUtils.vgap(10));
 
-		// ── Summary cards (grid-3: Session + Combat + Loot) ────────
+		// Summary cards (grid-3: Session + Combat + Loot)
 		JPanel sessionCard = buildSessionCard();
 		JPanel combatCard = buildCombatCard();
 
@@ -112,22 +112,36 @@ public class StatsPanel extends JPanel
 
 		JPanel summaryRow = PanelUtils.grid3(sessionCard, combatCard, lootCard);
 		summaryRow.setAlignmentX(LEFT_ALIGNMENT);
-		summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(200)));
-		add(summaryRow);
-		add(PanelUtils.vgap(6));
+		summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
+		body.add(summaryRow);
+		body.add(PanelUtils.vgap(6));
 
-		// ── Buttons ─────────────────────────────────────────────────
+		// Buttons
 		JButton copyBtn = PanelUtils.btn("Copy Stats");
 		copyBtn.addActionListener(e -> copyStats());
 		JPanel btnPanel = PanelUtils.btnRow(copyBtn);
 		btnPanel.setAlignmentX(LEFT_ALIGNMENT);
-		add(btnPanel);
-		add(PanelUtils.vgap(4));
+		body.add(btnPanel);
 
+		JPanel bodyWrapper = new JPanel(new BorderLayout());
+		bodyWrapper.setBackground(PanelUtils.PAGE_BG);
+		bodyWrapper.add(body, BorderLayout.NORTH);
+
+		JScrollPane scroll = new JScrollPane(bodyWrapper,
+			JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(null);
+		scroll.setBackground(PanelUtils.PAGE_BG);
+		scroll.getViewport().setBackground(PanelUtils.PAGE_BG);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+		add(scroll, BorderLayout.CENTER);
+
+		// ── SOUTH: footer ───────────────────────────────────────────
 		footerLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		footerLabel.setFont(footerLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		footerLabel.setAlignmentX(LEFT_ALIGNMENT);
-		add(footerLabel);
+		footerLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		footerLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(footerLabel, BorderLayout.SOUTH);
 	}
 
 	private JPanel buildSessionCard()
@@ -157,10 +171,10 @@ public class StatsPanel extends JPanel
 	}
 
 	@SuppressWarnings("unchecked")
-	public void refresh()
+	public void refresh(ClientSnapshot snap)
 	{
 		GameStateServer server = plugin.getApiServer();
-		if (server == null || client.getGameState() != GameState.LOGGED_IN)
+		if (server == null || snap == null || !snap.loggedIn)
 		{
 			sessionXpLabel.setText("—");
 			sessionRateLabel.setText("—");
@@ -189,8 +203,8 @@ public class StatsPanel extends JPanel
 			String name = skill.name();
 			Integer baseline = baselines.get(name);
 
-			int currentXp = client.getSkillExperience(skill);
-			int currentLevel = client.getRealSkillLevel(skill);
+			int currentXp = snap.getSkillExperience(skill);
+			int currentLevel = snap.getRealLevel(skill);
 			int gained = baseline != null ? currentXp - baseline : 0;
 
 			// Calculate % to next level
@@ -233,10 +247,7 @@ public class StatsPanel extends JPanel
 		startedLabel.setText(String.format("%dh %dm ago", hours, mins));
 
 		// Combat summary
-		if (client.getLocalPlayer() != null)
-		{
-			combatLvlLabel.setText(String.valueOf(client.getLocalPlayer().getCombatLevel()));
-		}
+		combatLvlLabel.setText(String.valueOf(snap.combatLevel));
 		// Damage dealt/taken/deaths are not tracked by the plugin; show placeholder
 		dmgDealtLabel.setText("—");
 		dmgTakenLabel.setText("—");
@@ -256,7 +267,7 @@ public class StatsPanel extends JPanel
 		{
 			JLabel noLoot = new JLabel("No loot yet");
 			noLoot.setForeground(PanelUtils.MUTED);
-			noLoot.setFont(noLoot.getFont().deriveFont(fontSize(10f)));
+			noLoot.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 			lootListPanel.add(noLoot);
 		}
 		lootListPanel.revalidate();
@@ -304,15 +315,15 @@ public class StatsPanel extends JPanel
 	@SuppressWarnings("unchecked")
 	private JPanel createLootRow(Map<String, Object> drop)
 	{
-		JPanel row = new JPanel(new BorderLayout(px(4), 0));
+		JPanel row = new JPanel(new BorderLayout(4, 0));
 		row.setOpaque(false);
-		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(18)));
+		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 		row.setAlignmentX(LEFT_ALIGNMENT);
 
 		String npcName = String.valueOf(drop.getOrDefault("npcName", "Unknown"));
 		JLabel npcLabel = new JLabel(npcName);
 		npcLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		npcLabel.setFont(npcLabel.getFont().deriveFont(fontSize(10f)));
+		npcLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 		row.add(npcLabel, BorderLayout.WEST);
 
 		List<Map<String, Object>> items = (List<Map<String, Object>>) drop.get("items");
@@ -331,7 +342,7 @@ public class StatsPanel extends JPanel
 
 			JLabel il = new JLabel(sb.toString());
 			il.setForeground(PanelUtils.GOLD);
-			il.setFont(il.getFont().deriveFont(fontSize(10f)));
+			il.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 			row.add(il, BorderLayout.EAST);
 		}
 		return row;
@@ -357,11 +368,12 @@ public class StatsPanel extends JPanel
 		sb.append("=== XP Gains ===\n");
 
 		int totalGained = 0;
+		ClientSnapshot snap = plugin.getLatestSnapshot();
 		for (Skill skill : SKILL_ORDER)
 		{
 			Integer baseline = baselines.get(skill.name());
 			if (baseline == null) continue;
-			int gained = client.getSkillExperience(skill) - baseline;
+			int gained = (snap != null ? snap.getSkillExperience(skill) : 0) - baseline;
 			if (gained > 0)
 			{
 				totalGained += gained;
@@ -413,29 +425,29 @@ public class StatsPanel extends JPanel
 
 		private static final Color CELL_BG = new Color(0x1a, 0x1a, 0x1a);
 		private static final Color BAR_TRACK = new Color(0x0a, 0x0a, 0x0a);
-		private static final int BAR_H = px(4);
+		private static final int BAR_H = 4;
 
 		SkillCell(Skill skill)
 		{
 			setLayout(new BorderLayout());
 			setBackground(CELL_BG);
-			setBorder(new EmptyBorder(px(6), px(10), px(6) + BAR_H + px(3), px(10)));
-			setPreferredSize(new Dimension(0, px(40)));
+			setBorder(new EmptyBorder(6, 10, 6 + BAR_H + 3, 10));
+			setPreferredSize(new Dimension(0, 40));
 
 			nameLabel = new JLabel(capitalize(skill.name()));
 			nameLabel.setForeground(new Color(0xdd, 0xdd, 0xdd));
-			nameLabel.setFont(nameLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
+			nameLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
 			add(nameLabel, BorderLayout.WEST);
 
-			JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(6), 0));
+			JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
 			rightPanel.setOpaque(false);
 
 			levelLabel = new JLabel("—");
 			levelLabel.setForeground(Color.WHITE);
-			levelLabel.setFont(levelLabel.getFont().deriveFont(Font.BOLD, fontSize(10f)));
+			levelLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.BOLD, (int) PanelUtils.FONT_SMALL));
 
 			deltaLabel = new JLabel("");
-			deltaLabel.setFont(deltaLabel.getFont().deriveFont(Font.PLAIN, fontSize(9f)));
+			deltaLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BADGE));
 			deltaLabel.setForeground(PanelUtils.MUTED);
 
 			rightPanel.add(deltaLabel);
@@ -479,18 +491,18 @@ public class StatsPanel extends JPanel
 
 			int w = getWidth();
 			int h = getHeight();
-			int barY = h - BAR_H - px(4);
+			int barY = h - BAR_H - 4;
 
 			// Bar track
 			g2.setColor(BAR_TRACK);
-			g2.fillRect(px(6), barY, w - px(12), BAR_H);
+			g2.fillRect(6, barY, w - 12, BAR_H);
 
 			// Bar fill
-			int fillW = (int) ((w - px(12)) * barPct);
+			int fillW = (int) ((w - 12) * barPct);
 			if (fillW > 0)
 			{
 				g2.setColor(barColor);
-				g2.fillRect(px(6), barY, fillW, BAR_H);
+				g2.fillRect(6, barY, fillW, BAR_H);
 			}
 
 			g2.dispose();

@@ -1,6 +1,5 @@
 package com.osrscompanion.panels;
 
-import static com.osrscompanion.UiScale.*;
 
 import com.osrscompanion.GameStateServer;
 import com.osrscompanion.OsrsCompanionPlugin;
@@ -81,76 +80,77 @@ public class RecordingPanel extends JPanel
 	public RecordingPanel(OsrsCompanionPlugin plugin)
 	{
 		this.plugin = plugin;
-		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+		setLayout(new BorderLayout());
 		setBackground(PanelUtils.PAGE_BG);
-		setBorder(new EmptyBorder(px(16), px(20), px(16), px(20)));
+		setBorder(new EmptyBorder(16, 20, 16, 20));
 
-		// Panel header
+		// ── NORTH: header, controls, presets, event types ───────────
+		JPanel north = new JPanel();
+		north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+		north.setOpaque(false);
+
 		JPanel head = PanelUtils.panelHead("Record", "capture a slice of game events to disk");
 		head.setAlignmentX(LEFT_ALIGNMENT);
-		add(head);
-		add(PanelUtils.vgap(14));
+		north.add(head);
+		north.add(PanelUtils.vgap(14));
 
-		// ── Top row: grid-2 (Controls + Preset) ─────────────────────
+		// Top row: grid-2 (Controls + Preset)
 		JPanel controlsCard = buildControlsCard();
 		JPanel presetCard   = buildPresetCard();
 		JPanel topRow = PanelUtils.grid2(controlsCard, presetCard);
 		topRow.setAlignmentX(LEFT_ALIGNMENT);
-		topRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(300)));
-		add(topRow);
-		add(PanelUtils.vgap(14));
+		topRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
+		north.add(topRow);
+		north.add(PanelUtils.vgap(14));
 
-		// ── Event Types card (full width, 4-col grid) ───────────────
+		// Event Types card (full width, 4-col grid)
 		JPanel eventCard = buildEventTypesCard();
 		eventCard.setAlignmentX(LEFT_ALIGNMENT);
-		add(eventCard);
-		add(PanelUtils.vgap(14));
+		north.add(eventCard);
+		north.add(PanelUtils.vgap(14));
 
-		// ── Recorded Events viewer ──────────────────────────────────
-		JPanel viewerCard = PanelUtils.card();
-		viewerCard.setLayout(new BoxLayout(viewerCard, BoxLayout.Y_AXIS));
-		viewerCard.setAlignmentX(LEFT_ALIGNMENT);
-		viewerCard.add(PanelUtils.cardHeader("Recorded Events"));
-		viewerCard.add(PanelUtils.vgap(8));
-
-		JPanel viewerControls = new JPanel(new BorderLayout(px(4), 0));
-		viewerControls.setOpaque(false);
-		viewerControls.setAlignmentX(LEFT_ALIGNMENT);
-		viewerControls.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(30)));
+		// Viewer header + controls (stays fixed above the scroll)
+		JPanel viewerHeader = new JPanel(new BorderLayout(4, 0));
+		viewerHeader.setOpaque(false);
+		viewerHeader.setAlignmentX(LEFT_ALIGNMENT);
+		viewerHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
 		JButton loadBtn = PanelUtils.btn("Load Events");
 		loadBtn.addActionListener(e -> loadRecordedEvents());
-		viewerControls.add(loadBtn, BorderLayout.WEST);
+		viewerHeader.add(loadBtn, BorderLayout.WEST);
+
+		JLabel viewerTitle = PanelUtils.cardHeader("Recorded Events");
+		viewerTitle.setHorizontalAlignment(SwingConstants.CENTER);
+		viewerHeader.add(viewerTitle, BorderLayout.CENTER);
 
 		JButton copyEventsBtn = PanelUtils.btn("Copy All");
 		copyEventsBtn.addActionListener(e -> copyRecordedEvents());
-		viewerControls.add(copyEventsBtn, BorderLayout.EAST);
+		viewerHeader.add(copyEventsBtn, BorderLayout.EAST);
 
-		viewerCard.add(viewerControls);
-		viewerCard.add(PanelUtils.vgap(4));
+		north.add(viewerHeader);
+		north.add(PanelUtils.vgap(4));
 
+		add(north, BorderLayout.NORTH);
+
+		// ── CENTER: events pane with scroll ─────────────────────────
 		eventsPane = new JTextPane();
 		eventsPane.setEditable(false);
 		eventsPane.setBackground(PanelUtils.FEED_BG);
-		eventsPane.setFont(PanelUtils.monoFont(10f));
+		eventsPane.setFont(PanelUtils.monoFont(PanelUtils.FONT_MONO));
 		eventsPane.setForeground(Color.WHITE);
 		PanelUtils.installTextPopup(eventsPane);
 
 		JScrollPane eventsScroll = new JScrollPane(eventsPane);
 		eventsScroll.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1));
-		eventsScroll.setPreferredSize(new Dimension(0, px(200)));
-		eventsScroll.getVerticalScrollBar().setUnitIncrement(px(16));
-		eventsScroll.setAlignmentX(LEFT_ALIGNMENT);
-		viewerCard.add(eventsScroll);
-		viewerCard.add(PanelUtils.vgap(4));
+		eventsScroll.getVerticalScrollBar().setUnitIncrement(16);
 
+		add(eventsScroll, BorderLayout.CENTER);
+
+		// ── SOUTH: footer ───────────────────────────────────────────
 		eventsFooterLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		eventsFooterLabel.setFont(eventsFooterLabel.getFont().deriveFont(Font.PLAIN, fontSize(10f)));
-		eventsFooterLabel.setAlignmentX(LEFT_ALIGNMENT);
-		viewerCard.add(eventsFooterLabel);
-
-		add(viewerCard);
-		add(Box.createVerticalGlue());
+		eventsFooterLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_SMALL));
+		eventsFooterLabel.setBorder(new EmptyBorder(4, 0, 0, 0));
+		add(eventsFooterLabel, BorderLayout.SOUTH);
 
 		// initialise toggle button reference
 		toggleBtn = null; // assigned in buildControlsCard
@@ -168,16 +168,16 @@ public class RecordingPanel extends JPanel
 		card.add(PanelUtils.vgap(10));
 
 		// Status row with recording dot
-		JPanel statusRow = new JPanel(new BorderLayout(px(12), 0));
+		JPanel statusRow = new JPanel(new BorderLayout(12, 0));
 		statusRow.setOpaque(false);
-		statusRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(20)));
+		statusRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 		statusRow.setAlignmentX(LEFT_ALIGNMENT);
 		JLabel statusKey = new JLabel("Status");
 		statusKey.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		statusKey.setFont(statusKey.getFont().deriveFont(Font.PLAIN, fontSize(12f)));
-		statusKey.setPreferredSize(new Dimension(px(110), px(18)));
+		statusKey.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
+		statusKey.setPreferredSize(new Dimension(110, 18));
 		statusRow.add(statusKey, BorderLayout.WEST);
-		JPanel statusRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, px(4), 0));
+		JPanel statusRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		statusRight.setOpaque(false);
 		statusRight.add(recordingDot);
 		statusRight.add(statusVal);
@@ -195,6 +195,7 @@ public class RecordingPanel extends JPanel
 		internalToggleBtn.setText("Start Recording");
 		internalToggleBtn.setBackground(PanelUtils.GREEN);
 		internalToggleBtn.addActionListener(e -> toggleRecording());
+		revealBtn.addActionListener(e -> revealRecordingFile());
 
 		JPanel btns = PanelUtils.btnRow(internalToggleBtn, pauseBtn, revealBtn);
 		btns.setAlignmentX(LEFT_ALIGNMENT);
@@ -213,29 +214,30 @@ public class RecordingPanel extends JPanel
 		card.add(PanelUtils.vgap(10));
 
 		// Preset buttons row
-		JPanel presetRow = new JPanel(new FlowLayout(FlowLayout.LEFT, px(4), px(2)));
+		JPanel presetRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
 		presetRow.setOpaque(false);
 		presetRow.setAlignmentX(LEFT_ALIGNMENT);
 		for (String preset : PRESETS.keySet())
 		{
-			JButton btn = "All".equals(preset) ? PanelUtils.btnPrimary(preset) : PanelUtils.btn(preset);
+			JButton btn = PanelUtils.btn(preset);
 			btn.addActionListener(e -> applyPreset(preset));
 			presetButtons.put(preset, btn);
 			presetRow.add(btn);
 		}
+		applyPreset("All");
 		card.add(presetRow);
 		card.add(PanelUtils.vgap(10));
 
 		// Duration spinner
-		JPanel durRow = new JPanel(new BorderLayout(px(12), 0));
+		JPanel durRow = new JPanel(new BorderLayout(12, 0));
 		durRow.setOpaque(false);
-		durRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, px(24)));
+		durRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
 		durRow.setAlignmentX(LEFT_ALIGNMENT);
 		JLabel durLabel = new JLabel("Duration (sec):");
 		durLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		durLabel.setFont(durLabel.getFont().deriveFont(fontSize(11f)));
+		durLabel.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 		durationSpinner = new JSpinner(new SpinnerNumberModel(180, 30, 600, 30));
-		durationSpinner.setPreferredSize(new Dimension(px(70), px(22)));
+		durationSpinner.setPreferredSize(new Dimension(70, 22));
 		durRow.add(durLabel, BorderLayout.WEST);
 		durRow.add(durationSpinner, BorderLayout.EAST);
 		card.add(durRow);
@@ -259,14 +261,14 @@ public class RecordingPanel extends JPanel
 		card.add(PanelUtils.cardHeader("Event types"));
 		card.add(PanelUtils.vgap(10));
 
-		JPanel grid = new JPanel(new GridLayout(0, 4, px(14), px(6)));
+		JPanel grid = new JPanel(new GridLayout(0, 4, 14, 6));
 		grid.setOpaque(false);
 		grid.setAlignmentX(LEFT_ALIGNMENT);
 
 		for (String type : ALL_EVENT_TYPES)
 		{
 			JCheckBox cb = new JCheckBox(type, true);
-			cb.setFont(cb.getFont().deriveFont(Font.PLAIN, fontSize(11f)));
+			cb.setFont(new Font(PanelUtils.FONT_FAMILY, Font.PLAIN, (int) PanelUtils.FONT_BODY));
 			cb.setForeground(new Color(0xc8, 0xc8, 0xc8));
 			cb.setBackground(PanelUtils.CARD_BG);
 			cb.setFocusPainted(false);
@@ -331,6 +333,17 @@ public class RecordingPanel extends JPanel
 		}
 
 		durationVal.setText((int) durationSpinner.getValue() + " sec");
+
+		java.io.File lastFile = server.getLastRecordingFile();
+		if (lastFile != null && lastFile.exists())
+		{
+			long bytes = lastFile.length();
+			fileSizeVal.setText(bytes < 1024 ? bytes + " B" : (bytes / 1024) + " KB");
+		}
+		else
+		{
+			fileSizeVal.setText("—");
+		}
 	}
 
 	// ── Recording control ───────────────────────────────────────────
@@ -377,18 +390,13 @@ public class RecordingPanel extends JPanel
 		// Update button styling
 		for (Map.Entry<String, JButton> entry : presetButtons.entrySet())
 		{
-			JButton b = entry.getValue();
 			if (entry.getKey().equals(preset))
 			{
-				b.setBackground(ColorScheme.BRAND_ORANGE);
-				b.setForeground(new Color(0x1e, 0x1e, 0x1e));
-				b.setFont(b.getFont().deriveFont(Font.BOLD));
+				PanelUtils.styleAsActive(entry.getValue());
 			}
 			else
 			{
-				b.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
-				b.setForeground(Color.WHITE);
-				b.setFont(b.getFont().deriveFont(Font.PLAIN));
+				PanelUtils.styleAsInactive(entry.getValue());
 			}
 		}
 	}
@@ -428,7 +436,7 @@ public class RecordingPanel extends JPanel
 		for (int i = 0; i < max; i++)
 		{
 			Map<String, Object> evt = events.get(i);
-			String type = String.valueOf(evt.getOrDefault("type", "?"));
+			String type = String.valueOf(evt.getOrDefault("eventType", "?"));
 			int tick = evt.containsKey("tick") ? ((Number) evt.get("tick")).intValue() : 0;
 			sb.append("[").append(tick).append("] ").append(type).append(": ");
 			sb.append(buildEventSummary(type, evt)).append("\n");
@@ -449,13 +457,38 @@ public class RecordingPanel extends JPanel
 		sb.append("=== Recorded Events (").append(events.size()).append(") ===\n");
 		for (Map<String, Object> evt : events)
 		{
-			String type = String.valueOf(evt.getOrDefault("type", "?"));
+			String type = String.valueOf(evt.getOrDefault("eventType", "?"));
 			int tick = evt.containsKey("tick") ? ((Number) evt.get("tick")).intValue() : 0;
 			sb.append("[").append(tick).append("] ").append(type).append(": ");
 			sb.append(buildEventSummary(type, evt)).append("\n");
 		}
 		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
 			new StringSelection(sb.toString()), null);
+	}
+
+	private void revealRecordingFile()
+	{
+		GameStateServer server = plugin.getApiServer();
+		java.io.File file = server != null ? server.getLastRecordingFile() : null;
+		java.io.File target;
+		if (file != null && file.exists())
+		{
+			target = file.getParentFile();
+		}
+		else
+		{
+			target = new java.io.File(System.getProperty("user.home"), ".runelite/osrs-companion/recordings");
+			if (!target.exists()) target.mkdirs();
+		}
+		try
+		{
+			java.awt.Desktop.getDesktop().open(target);
+		}
+		catch (Exception ex)
+		{
+			JOptionPane.showMessageDialog(this, "Could not open folder: " + ex.getMessage(),
+				"Error", JOptionPane.ERROR_MESSAGE);
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -493,8 +526,70 @@ public class RecordingPanel extends JPanel
 			}
 			case "chat_message":
 				return String.valueOf(evt.getOrDefault("message", ""));
+			case "game_state_changed":
+				return "state=" + evt.getOrDefault("state", "?");
+			case "stat_changed":
+			{
+				Object skill = evt.get("skill");
+				Object xp = evt.get("xp");
+				Object level = evt.get("level");
+				return (skill != null ? skill : "?") + " xp=" + (xp != null ? xp : "?") + " lvl=" + (level != null ? level : "?");
+			}
+			case "var_changed":
+			{
+				Object varpIndex = evt.get("varpIndex");
+				Object oldVal = evt.get("oldValue");
+				Object newVal = evt.get("newValue");
+				return "varp " + (varpIndex != null ? varpIndex : "?") + ": " + (oldVal != null ? oldVal : "?") + " → " + (newVal != null ? newVal : "?");
+			}
+			case "game_tick":
+				return "tick " + evt.getOrDefault("tick", "?");
+			case "item_changed":
+			{
+				Object container = evt.get("container");
+				Object containerId = evt.get("containerId");
+				return (container != null ? container : "container") + " (" + (containerId != null ? containerId : "?") + ")";
+			}
+			case "gfx_created":
+			{
+				Object gfxId = evt.get("graphicsId");
+				Object pos = evt.get("position");
+				String posStr = "";
+				if (pos instanceof Map) {
+					Map<?, ?> p = (Map<?, ?>) pos;
+					Object wx = p.get("worldX");
+					Object wy = p.get("worldY");
+					posStr = " at (" + (wx != null ? wx : "?") + ", " + (wy != null ? wy : "?") + ")";
+				}
+				return "gfx " + (gfxId != null ? gfxId : "?") + posStr;
+			}
+			case "projectile_spawned":
+			{
+				Object projId = evt.get("projectileId");
+				Object targetActor = evt.get("targetActor");
+				String targetStr = "";
+				if (targetActor instanceof Map) {
+					Object n = ((Map<?, ?>) targetActor).get("name");
+					if (n != null) targetStr = " → " + n;
+				}
+				return "projectile " + (projId != null ? projId : "?") + targetStr;
+			}
 			default:
-				return type;
+			{
+				StringBuilder info = new StringBuilder();
+				for (Map.Entry<String, Object> e : evt.entrySet())
+				{
+					String k = e.getKey();
+					if ("eventType".equals(k) || "tick".equals(k) || "timestamp".equals(k)) continue;
+					if (info.length() > 0) info.append(", ");
+					Object v = e.getValue();
+					String vs = v != null ? String.valueOf(v) : "null";
+					if (vs.length() > 40) vs = vs.substring(0, 37) + "...";
+					info.append(k).append("=").append(vs);
+					if (info.length() > 120) { info.append("..."); break; }
+				}
+				return info.length() > 0 ? info.toString() : type;
+			}
 		}
 	}
 
@@ -510,8 +605,8 @@ public class RecordingPanel extends JPanel
 		RecordingDot()
 		{
 			setOpaque(false);
-			setPreferredSize(new Dimension(px(12), px(12)));
-			setMaximumSize(new Dimension(px(12), px(12)));
+			setPreferredSize(new Dimension(12, 12));
+			setMaximumSize(new Dimension(12, 12));
 		}
 
 		void setActive(boolean active)
@@ -531,7 +626,7 @@ public class RecordingPanel extends JPanel
 
 			int w = getWidth(), h = getHeight();
 			int cx = w / 2, cy = h / 2;
-			int r = px(4);
+			int r = 4;
 
 			// Glow
 			g2.setColor(new Color(0xdc, 0x32, 0x32, 60));

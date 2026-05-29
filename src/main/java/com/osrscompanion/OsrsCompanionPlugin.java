@@ -85,6 +85,7 @@ public class OsrsCompanionPlugin extends Plugin
 	private int tickCounter = 0;
 	private int syncTickThreshold = 100;
 	private boolean initialCollectionDone = false;
+	private volatile ClientSnapshot latestSnapshot;
 
 	// Var change tracking
 	private int[] oldVarps = null;
@@ -115,10 +116,6 @@ public class OsrsCompanionPlugin extends Plugin
 			logCaptureAppender = null;
 		}
 
-		// Initialise UI scale BEFORE any Swing panels are created
-		UiScale.init(config.guiScale());
-		log.info("GUI scale factor: {} (config={})", UiScale.SCALE, config.guiScale());
-
 		if (config.enableApiServer())
 		{
 			startApiServer();
@@ -134,10 +131,8 @@ public class OsrsCompanionPlugin extends Plugin
 			.build();
 		clientToolbar.addNavigation(navButton);
 
-		// Create the standalone GUI window (hidden until user clicks "Open GUI")
-		SwingUtilities.invokeLater(() -> {
-			guiFrame = new OsrsCompanionFrame(client, config, this);
-		});
+		// GUI frame is created lazily in openGui() so the sidebar panel is
+		// in RuneLite's component hierarchy (needed for parent window lookup).
 
 		log.info("OSRS Companion started — saving to ~/.runelite/osrs-companion/");
 	}
@@ -222,6 +217,11 @@ public class OsrsCompanionPlugin extends Plugin
 		return apiServer;
 	}
 
+	public ClientSnapshot getLatestSnapshot()
+	{
+		return latestSnapshot;
+	}
+
 	public TickStateBuffer getTickBuffer()
 	{
 		return tickBuffer;
@@ -252,7 +252,8 @@ public class OsrsCompanionPlugin extends Plugin
 		SwingUtilities.invokeLater(() -> {
 			if (guiFrame == null)
 			{
-				guiFrame = new OsrsCompanionFrame(client, config, this);
+				java.awt.Window owner = SwingUtilities.getWindowAncestor(panel);
+				guiFrame = new OsrsCompanionFrame(owner, config, this);
 			}
 			guiFrame.open();
 		});
@@ -641,6 +642,8 @@ public class OsrsCompanionPlugin extends Plugin
 		// Refresh sidebar panel and GUI window every 3 ticks (~1.8s)
 		if (client.getTickCount() % 3 == 0)
 		{
+			final ClientSnapshot snap = ClientSnapshot.capture(client);
+			latestSnapshot = snap;
 			SwingUtilities.invokeLater(() -> {
 				if (panel != null)
 				{
@@ -648,7 +651,7 @@ public class OsrsCompanionPlugin extends Plugin
 				}
 				if (guiFrame != null && guiFrame.isVisible())
 				{
-					guiFrame.refreshActiveTab();
+					guiFrame.refreshActiveTab(snap);
 				}
 			});
 		}
@@ -1326,10 +1329,14 @@ public class OsrsCompanionPlugin extends Plugin
 		// If no actor target, compute the area target from the position
 		if (target == null)
 		{
-			int targetX = (int) proj.getX1();
-			int targetY = (int) proj.getY1();
-			LocalPoint lp = new LocalPoint(targetX, targetY);
-			targetPoint = WorldPoint.fromLocal(client, lp);
+			try
+			{
+				int targetX = (int) proj.getX1();
+				int targetY = (int) proj.getY1();
+				LocalPoint lp = new LocalPoint(targetX, targetY);
+				targetPoint = WorldPoint.fromLocal(client, lp);
+			}
+			catch (Exception ignored) {}
 		}
 		if (targetPoint != null)
 		{

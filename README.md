@@ -112,15 +112,41 @@ The MCP server provides tools across eight categories:
 | `get_my_combat_achievements` | Saved combat achievement status |
 | `player` | Fetch player data via WikiSync API |
 
+## Prerequisites
+
+- **Java 11+** (JDK, not JRE) — required for building the RuneLite plugin
+- **Node.js 18+** and **npm** — required for building the MCP server
+
 ## Setup
 
-### 1. Install the RuneLite Plugin
+### 1. Build & Install the RuneLite Plugin
 
-Build and install the plugin into RuneLite:
+Clone the repo and build:
 
 ```bash
-.\gradlew.bat run
+git clone https://github.com/tomsherborne/runelite-json-export.git
+cd runelite-json-export
 ```
+
+**Option A — Run directly in RuneLite dev mode** (recommended for development):
+```bash
+# Windows
+.\gradlew.bat run
+
+# Linux/macOS
+./gradlew run
+```
+This launches RuneLite with the plugin pre-loaded in developer mode.
+
+**Option B — Build a standalone JAR** (for installing into an existing RuneLite):
+```bash
+# Windows
+.\gradlew.bat build
+
+# Linux/macOS
+./gradlew build
+```
+The built JAR is at `build/libs/runelite-json-export-1.0-SNAPSHOT.jar`. Copy it to your RuneLite external plugins folder or load it via the RuneLite plugin hub.
 
 ### 2. Build the MCP Server
 
@@ -130,22 +156,59 @@ npm install
 npm run build
 ```
 
-### 3. Configure Claude Desktop
+This compiles the TypeScript source in `mcp-server/src/` to JavaScript in `mcp-server/dist/`.
 
-Add to your Claude Desktop MCP config (`%APPDATA%\Claude\claude_desktop_config.json`):
+### 3. Configure MCP
+
+The MCP server connects AI assistants to the plugin's HTTP API. Configure it for whichever client you use:
+
+#### Claude Desktop
+
+Add to `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ```json
 {
   "mcpServers": {
     "osrs-companion": {
       "command": "node",
-      "args": ["C:\\path\\to\\runelite-json-export\\mcp-server\\dist\\index.js"]
+      "args": ["C:\\path\\to\\runelite-json-export\\mcp-server\\dist\\index.js"],
+      "env": {
+        "OSRS_API_URL": "http://127.0.0.1:8085"
+      }
     }
   }
 }
 ```
 
 Restart Claude Desktop after updating the config.
+
+#### Claude Code
+
+Add the MCP server via the CLI:
+
+```bash
+claude mcp add osrs-companion node /path/to/runelite-json-export/mcp-server/dist/index.js
+```
+
+Or add it manually to `.claude/settings.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "osrs-companion": {
+      "command": "node",
+      "args": ["/path/to/runelite-json-export/mcp-server/dist/index.js"],
+      "env": {
+        "OSRS_API_URL": "http://127.0.0.1:8085"
+      }
+    }
+  }
+}
+```
+
+#### Other MCP Clients
+
+Any MCP-compatible client can connect. The server uses **stdio** transport. Set the `OSRS_API_URL` environment variable if the plugin API runs on a non-default port (default: `http://127.0.0.1:8085`).
 
 ### 4. Try It
 
