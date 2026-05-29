@@ -123,49 +123,32 @@ The MCP server provides tools across eight categories:
 
 ## Prerequisites
 
-- **Java 11+** (JDK, not JRE) — required for building the RuneLite plugin
-- **Node.js 18+** and **npm** — required for building the MCP server
+- **Node.js 18+** — required to run the MCP server
+- **Java 11+** (JDK) and **Node.js 18+** — only needed if building from source
 
-## Setup
+## Quick Start (Recommended)
 
-### 1. Build & Install the RuneLite Plugin
+Download the latest release from the [Releases page](../../releases/latest). You'll find two files:
+- `osrs-companion-<version>-all.jar` — the RuneLite plugin
+- `osrs-mcp-server-<version>.zip` — the MCP server
 
-Clone the repo and build:
+### 1. Install the RuneLite Plugin
 
-```bash
-git clone https://github.com/tomsherborne/runelite-json-export.git
-cd runelite-json-export
-```
+1. Open RuneLite and go to **Configuration** (wrench icon) → **RuneLite** plugin settings
+2. Scroll down and enable **"Enable sideloaded plugins"** (requires Developer Mode — launch RuneLite with `--developer-mode` if the option isn't visible)
+3. Copy `osrs-companion-<version>-all.jar` to your RuneLite plugins folder:
+   - **Windows:** `%USERPROFILE%\.runelite\plugins\`
+   - **macOS/Linux:** `~/.runelite/plugins/`
+4. Restart RuneLite — the **OSRS MCP Companion** plugin will appear in the plugin list
 
-**Option A — Run directly in RuneLite dev mode** (recommended for development):
-```bash
-# Windows
-.\gradlew.bat run
+### 2. Set Up the MCP Server
 
-# Linux/macOS
-./gradlew run
-```
-This launches RuneLite with the plugin pre-loaded in developer mode.
-
-**Option B — Build a standalone JAR** (for installing into an existing RuneLite):
-```bash
-# Windows
-.\gradlew.bat build
-
-# Linux/macOS
-./gradlew build
-```
-The built JAR is at `build/libs/runelite-json-export-1.0-SNAPSHOT.jar`. Copy it to your RuneLite external plugins folder or load it via the RuneLite plugin hub.
-
-### 2. Build the MCP Server
-
-```bash
-cd mcp-server
-npm install
-npm run build
-```
-
-This compiles the TypeScript source in `mcp-server/src/` to JavaScript in `mcp-server/dist/`.
+1. Extract `osrs-mcp-server-<version>.zip` to a permanent folder (e.g. `C:\osrs-mcp\` or `~/osrs-mcp/`)
+2. Open a terminal in that folder and install dependencies:
+   ```bash
+   npm install --production
+   ```
+3. Note the full path to `dist/index.js` inside the extracted folder — you'll need it in the next step
 
 ### 3. Configure MCP
 
@@ -180,7 +163,7 @@ Add to `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/App
   "mcpServers": {
     "osrs-companion": {
       "command": "node",
-      "args": ["C:\\path\\to\\runelite-json-export\\mcp-server\\dist\\index.js"],
+      "args": ["C:\\osrs-mcp\\dist\\index.js"],
       "env": {
         "OSRS_API_URL": "http://127.0.0.1:8085"
       }
@@ -189,24 +172,22 @@ Add to `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/App
 }
 ```
 
-Restart Claude Desktop after updating the config.
+Replace `C:\\osrs-mcp\\dist\\index.js` with the actual path to `dist/index.js` in your extracted folder. Restart Claude Desktop after saving.
 
 #### Claude Code
 
-Add the MCP server via the CLI:
-
 ```bash
-claude mcp add osrs-companion node /path/to/runelite-json-export/mcp-server/dist/index.js
+claude mcp add osrs-companion node /path/to/osrs-mcp/dist/index.js
 ```
 
-Or add it manually to `.claude/settings.json` in your project:
+Or add it manually to `.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "osrs-companion": {
       "command": "node",
-      "args": ["/path/to/runelite-json-export/mcp-server/dist/index.js"],
+      "args": ["/path/to/osrs-mcp/dist/index.js"],
       "env": {
         "OSRS_API_URL": "http://127.0.0.1:8085"
       }
@@ -217,7 +198,7 @@ Or add it manually to `.claude/settings.json` in your project:
 
 #### Other MCP Clients
 
-Any MCP-compatible client can connect. The server uses **stdio** transport. Set the `OSRS_API_URL` environment variable if the plugin API runs on a non-default port (default: `http://127.0.0.1:8085`).
+Any MCP-compatible client can connect. The server uses **stdio** transport. Set `OSRS_API_URL` if the plugin runs on a non-default port (default: `http://127.0.0.1:8085`).
 
 ### 4. Try It
 
@@ -238,6 +219,32 @@ With RuneLite running and the plugin enabled, ask Claude things like:
 - "Any errors in the RuneLite console?" (reads plugin logs)
 - "What chat messages came in?" (reads recent chat)
 - "Show me raw actions — anything bypass the menu?" (multi-layer action capture)
+
+## Building from Source
+
+Requires **Java 11+ JDK** and **Node.js 18+**.
+
+```bash
+git clone https://github.com/Sleepywalker69/OSRS-MCP-Companion.git
+cd OSRS-MCP-Companion
+```
+
+**RuneLite plugin:**
+```bash
+# Run directly in RuneLite dev mode
+./gradlew run          # Linux/macOS
+.\gradlew.bat run      # Windows
+
+# Or build a JAR
+./gradlew shadowJar    # output: build/libs/osrs-companion-*-all.jar
+```
+
+**MCP server:**
+```bash
+cd mcp-server
+npm install
+npm run build          # output: mcp-server/dist/
+```
 
 ## Live API Endpoints
 
