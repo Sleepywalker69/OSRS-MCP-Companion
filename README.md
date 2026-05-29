@@ -1,4 +1,13 @@
-# OSRS MCP Companion — RuneLite Plugin + MCP Server
+<p align="center">
+  <img src="Images/GH titlecard.png" alt="OSRS MCP Companion" width="600">
+</p>
+
+<p align="center">
+  <strong>Live game data + AI assistant bridge for Old School RuneScape</strong><br>
+  RuneLite plugin &bull; Local HTTP API &bull; 57 MCP tools
+</p>
+
+---
 
 A RuneLite plugin that exposes **live game data** via a local HTTP API, paired
 with an MCP server that gives AI assistants (Claude Desktop, Claude Code, etc.)
@@ -292,6 +301,16 @@ All 53 endpoints available at `http://127.0.0.1:8085`:
 ## Standalone GUI Window
 
 Click the **Open GUI** button in the RuneLite sidebar to launch a standalone 1100×720 window with 8 data tabs, a nav rail, live header status pills, and a footer status bar. Supports standard minimize/maximize/close window controls. The sidebar stays slim — just a brand header, the launch button, and a compact live-status block.
+
+<p align="center">
+  <img src="Images/Dashboard GUI.png" alt="Dashboard GUI" width="800"><br>
+  <em>Dashboard tab — player stats, API status, session info, and quick actions</em>
+</p>
+
+<p align="center">
+  <img src="Images/Sidebar GUI.png" alt="Sidebar Panel" width="260"><br>
+  <em>RuneLite sidebar — compact status block with Open GUI button</em>
+</p>
 
 **Keyboard shortcuts:** `Ctrl+1-8` to switch tabs, `Esc` to close (state preserved, reopen from sidebar).
 
